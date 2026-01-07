@@ -61,20 +61,63 @@ document.addEventListener('DOMContentLoaded', () => {
 // Autenticazione
 function initAuth() {
     const logoutBtn = document.getElementById('logoutBtn');
+    const menuToggleBtn = document.getElementById('menuToggleBtn');
+    const menuDropdown = document.getElementById('menuDropdown');
+    const menuSettings = document.getElementById('menuSettings');
     
-    logoutBtn.addEventListener('click', async () => {
-        try {
-            await auth.signOut();
-            window.location.href = 'index.html';
-        } catch (error) {
-            alert('Errore durante il logout: ' + error.message);
+    // Menu toggle
+    if (menuToggleBtn) {
+        menuToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            menuDropdown.classList.toggle('show');
+        });
+    }
+    
+    // Chiudi menu quando si clicca fuori
+    document.addEventListener('click', (e) => {
+        if (menuDropdown && !menuDropdown.contains(e.target) && !menuToggleBtn.contains(e.target)) {
+            menuDropdown.classList.remove('show');
         }
     });
+    
+    // Menu items
+    if (menuSettings) {
+        menuSettings.addEventListener('click', (e) => {
+            e.preventDefault();
+            menuDropdown.classList.remove('show');
+            // Attiva tab impostazioni
+            const settingsTab = document.querySelector('.tab-btn[data-tab="settings"]');
+            if (settingsTab) {
+                settingsTab.click();
+            }
+        });
+    }
+    
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await auth.signOut();
+                window.location.href = 'index.html';
+            } catch (error) {
+                alert('Errore durante il logout: ' + error.message);
+            }
+        });
+    }
 }
 
 // Calendario Admin
 function initCalendar() {
     const calendarEl = document.getElementById('adminCalendar');
+    
+    if (!calendarEl) {
+        console.error('Elemento calendario non trovato');
+        return;
+    }
+    
+    // Se il calendario esiste già, distruggilo prima di ricrearlo
+    if (adminCalendar) {
+        adminCalendar.destroy();
+    }
     
     adminCalendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'timeGridDay',
@@ -86,6 +129,7 @@ function initCalendar() {
         },
         slotMinTime: '08:00:00',
         slotMaxTime: '20:00:00',
+        height: 'auto',
         events: [],
         eventClick: (info) => {
             showBookingDetail(info.event.id);
@@ -93,10 +137,17 @@ function initCalendar() {
         dateClick: (info) => {
             selectedDate = info.date;
             loadDayBookings();
-        }
+        },
+        eventDisplay: 'block',
+        dayMaxEvents: true
     });
 
-    adminCalendar.render();
+    // Renderizza solo se l'elemento è visibile
+    const calendarTab = document.getElementById('calendarTab');
+    if (calendarTab && calendarTab.classList.contains('active')) {
+        adminCalendar.render();
+        loadCalendarEvents();
+    }
 }
 
 // Modali
@@ -134,13 +185,37 @@ function initTabs() {
             
             // Aggiungi active al selezionato
             btn.classList.add('active');
-            document.getElementById(targetTab + 'Tab').classList.add('active');
+            const targetTabContent = document.getElementById(targetTab + 'Tab');
+            if (targetTabContent) {
+                targetTabContent.classList.add('active');
+            }
+            
+            // Inizializza calendario se necessario
+            if (targetTab === 'calendar') {
+                // Aspetta che il tab sia visibile prima di inizializzare/aggiornare il calendario
+                setTimeout(() => {
+                    const calendarEl = document.getElementById('adminCalendar');
+                    if (calendarEl) {
+                        if (adminCalendar) {
+                            // Se il calendario esiste già, aggiorna la vista
+                            adminCalendar.render();
+                            adminCalendar.updateSize();
+                            loadCalendarEvents();
+                        } else {
+                            // Altrimenti inizializzalo
+                            initCalendar();
+                        }
+                    }
+                }, 150);
+            }
             
             // Carica dati specifici per tab
             if (targetTab === 'bookings') {
                 loadAllBookings();
             } else if (targetTab === 'reports') {
                 generateReport();
+            } else if (targetTab === 'settings') {
+                loadSettings();
             }
         });
     });
@@ -248,6 +323,39 @@ function initEventListeners() {
     // Export
     document.getElementById('exportDataBtn')?.addEventListener('click', () => {
         exportData();
+    });
+
+    // Settings
+    document.getElementById('companyProfileForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await saveCompanyProfile();
+    });
+
+    document.getElementById('changePasswordBtn')?.addEventListener('click', async () => {
+        await changePassword();
+    });
+
+    document.getElementById('upgradePlanBtn')?.addEventListener('click', () => {
+        document.querySelector('.plans-grid')?.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.getElementById('manageBillingBtn')?.addEventListener('click', () => {
+        alert('Funzionalità di gestione fatturazione in arrivo. Per ora, contatta il supporto per modifiche al piano.');
+    });
+
+    document.querySelectorAll('.plan-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const plan = e.target.dataset.plan;
+            handlePlanChange(plan);
+        });
+    });
+
+    document.getElementById('deleteAccountBtn')?.addEventListener('click', async () => {
+        if (confirm('Sei sicuro di voler eliminare il tuo account? Questa azione è irreversibile e eliminerà tutti i dati.')) {
+            if (confirm('ULTIMA CONFERMA: Eliminare definitivamente l\'account?')) {
+                await deleteAccount();
+            }
+        }
     });
 }
 
@@ -1037,6 +1145,217 @@ async function sendStatusNotification(booking, status) {
         await window.sendStatusNotification(booking, status);
     } else {
         console.log('Invio notifica cambio stato:', status, booking);
+    }
+}
+
+// Settings Management
+async function loadSettings() {
+    if (!currentUser) return;
+
+    try {
+        // Carica profilo azienda
+        const companyDoc = await db.collection('companies').doc(currentUser.uid).get();
+        if (companyDoc.exists) {
+            const company = companyDoc.data();
+            document.getElementById('companyName').value = company.name || '';
+            document.getElementById('companyVat').value = company.vat || '';
+            document.getElementById('companyAddress').value = company.address || '';
+            document.getElementById('companyCity').value = company.city || '';
+            document.getElementById('companyZip').value = company.zip || '';
+            document.getElementById('companyPhone').value = company.phone || '';
+            document.getElementById('companyEmail').value = company.email || '';
+            document.getElementById('companyWebsite').value = company.website || '';
+        }
+
+        // Carica abbonamento
+        const subscriptionDoc = await db.collection('subscriptions').doc(currentUser.uid).get();
+        if (subscriptionDoc.exists) {
+            const subscription = subscriptionDoc.data();
+            const planNames = {
+                'free': 'Piano FREE',
+                'pro': 'Piano PRO',
+                'enterprise': 'Piano ENTERPRISE'
+            };
+            const planDetails = {
+                'free': 'Fino a 50 prenotazioni/mese - 2 operatori',
+                'pro': 'Prenotazioni illimitate - Fino a 5 operatori',
+                'enterprise': 'Operatori e sedi illimitati - Tutte le funzionalità'
+            };
+
+            document.getElementById('currentPlanName').textContent = planNames[subscription.plan] || 'Piano FREE';
+            document.getElementById('currentPlanDetails').textContent = planDetails[subscription.plan] || '';
+
+            if (subscription.status === 'active') {
+                document.getElementById('subscriptionStatus').textContent = 'Attivo';
+                document.getElementById('subscriptionStatus').className = 'status-badge status-active';
+            } else if (subscription.status === 'cancelled') {
+                document.getElementById('subscriptionStatus').textContent = 'Cancellato';
+                document.getElementById('subscriptionStatus').className = 'status-badge status-cancelled';
+            } else {
+                document.getElementById('subscriptionStatus').textContent = 'Inattivo';
+                document.getElementById('subscriptionStatus').className = 'status-badge status-inactive';
+            }
+
+            if (subscription.expiryDate) {
+                const expiry = subscription.expiryDate.toDate();
+                document.getElementById('subscriptionExpiry').textContent = `Scadenza: ${expiry.toLocaleDateString('it-IT')}`;
+            }
+        } else {
+            // Default a FREE se non esiste abbonamento
+            document.getElementById('currentPlanName').textContent = 'Piano FREE';
+            document.getElementById('currentPlanDetails').textContent = 'Fino a 50 prenotazioni/mese - 2 operatori';
+            document.getElementById('subscriptionStatus').textContent = 'Attivo';
+            document.getElementById('subscriptionStatus').className = 'status-badge status-active';
+        }
+
+        // Carica email account
+        document.getElementById('accountEmail').value = currentUser.email || '';
+
+        // Carica preferenze notifiche
+        const userDoc = await db.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            document.getElementById('notifyEmail').checked = userData.notifyEmail !== false;
+            document.getElementById('notifySMS').checked = userData.notifySMS === true;
+            document.getElementById('notifyReminders').checked = userData.notifyReminders !== false;
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento impostazioni:', error);
+    }
+}
+
+async function saveCompanyProfile() {
+    if (!currentUser) return;
+
+    try {
+        const companyData = {
+            name: document.getElementById('companyName').value,
+            vat: document.getElementById('companyVat').value,
+            address: document.getElementById('companyAddress').value,
+            city: document.getElementById('companyCity').value,
+            zip: document.getElementById('companyZip').value,
+            phone: document.getElementById('companyPhone').value,
+            email: document.getElementById('companyEmail').value,
+            website: document.getElementById('companyWebsite').value,
+            updatedAt: getTimestamp()
+        };
+
+        await db.collection('companies').doc(currentUser.uid).set(companyData, { merge: true });
+        alert('Profilo azienda salvato con successo!');
+    } catch (error) {
+        console.error('Errore nel salvataggio profilo:', error);
+        alert('Errore nel salvataggio: ' + error.message);
+    }
+}
+
+async function changePassword() {
+    if (!currentUser) return;
+
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (!newPassword || !confirmPassword) {
+        alert('Inserisci la nuova password e confermala');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        alert('La password deve essere di almeno 6 caratteri');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        alert('Le password non corrispondono');
+        return;
+    }
+
+    try {
+        await currentUser.updatePassword(newPassword);
+        alert('Password cambiata con successo!');
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+    } catch (error) {
+        console.error('Errore nel cambio password:', error);
+        let errorMessage = 'Errore nel cambio password';
+        
+        if (error.code === 'auth/requires-recent-login') {
+            errorMessage = 'Per sicurezza, effettua nuovamente il login prima di cambiare la password.';
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
+        alert(errorMessage);
+    }
+}
+
+async function handlePlanChange(plan) {
+    if (!currentUser) return;
+
+    if (plan === 'free') {
+        alert('Sei già sul piano FREE');
+        return;
+    }
+
+    if (plan === 'enterprise') {
+        alert('Per il piano Enterprise, contatta il supporto: support@petcalendar.com');
+        return;
+    }
+
+    const confirmUpgrade = confirm(`Vuoi passare al piano ${plan.toUpperCase()}?`);
+    if (!confirmUpgrade) return;
+
+    try {
+        const subscriptionData = {
+            plan: plan,
+            status: 'active',
+            startDate: getTimestamp(),
+            expiryDate: null,
+            updatedAt: getTimestamp()
+        };
+
+        await db.collection('subscriptions').doc(currentUser.uid).set(subscriptionData, { merge: true });
+        alert(`Piano ${plan.toUpperCase()} attivato con successo!`);
+        loadSettings();
+    } catch (error) {
+        console.error('Errore nel cambio piano:', error);
+        alert('Errore nell\'aggiornamento del piano: ' + error.message);
+    }
+}
+
+async function deleteAccount() {
+    if (!currentUser) return;
+
+    try {
+        // Elimina tutti i dati associati
+        const batch = db.batch();
+        
+        // Elimina prenotazioni
+        const bookings = await db.collection('bookings').where('userId', '==', currentUser.uid).get();
+        bookings.forEach(doc => batch.delete(doc.ref));
+
+        // Elimina animali
+        const animals = await db.collection('animals').where('userId', '==', currentUser.uid).get();
+        animals.forEach(doc => batch.delete(doc.ref));
+
+        // Elimina profilo utente
+        batch.delete(db.collection('users').doc(currentUser.uid));
+        
+        // Elimina profilo azienda
+        batch.delete(db.collection('companies').doc(currentUser.uid));
+        
+        // Elimina abbonamento
+        batch.delete(db.collection('subscriptions').doc(currentUser.uid));
+
+        await batch.commit();
+
+        // Elimina account Firebase
+        await currentUser.delete();
+        
+        alert('Account eliminato con successo');
+        window.location.href = 'index.html';
+    } catch (error) {
+        console.error('Errore nell\'eliminazione account:', error);
+        alert('Errore nell\'eliminazione account: ' + error.message);
     }
 }
 

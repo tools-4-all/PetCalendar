@@ -3,24 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PetCalendar - Prenotazioni Toelettatura</title>
+    <title>PetCalendar - Gestione Prenotazioni per Toelettatori</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/locales/it.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-    <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
     <nav class="navbar">
         <div class="container">
-            <h1 class="logo">🐾 PetCalendar</h1>
+            <h1 class="logo">PetCalendar</h1>
             <div class="nav-links">
-                <a href="index.html" class="active">Prenota</a>
-                <a href="admin.html">Dashboard Professionale</a>
+                <a href="index.html" class="active">Home</a>
                 <button id="loginBtn" class="btn btn-outline">Accedi</button>
                 <button id="logoutBtn" class="btn btn-outline" style="display: none;">Esci</button>
             </div>
@@ -32,106 +26,422 @@
         <div id="loginModal" class="modal">
             <div class="modal-content">
                 <span class="close">&times;</span>
-                <h2>Accedi o Registrati</h2>
+                <h2>Accedi alla Dashboard</h2>
+                <p style="color: var(--dark-color); margin-bottom: 1rem; font-size: 0.9rem;">
+                    Accesso riservato alle aziende di toelettatura
+                </p>
                 <form id="authForm">
-                    <input type="email" id="email" placeholder="Email" required>
+                    <input type="email" id="email" placeholder="Email aziendale" required>
                     <input type="password" id="password" placeholder="Password" required>
                     <button type="submit" class="btn btn-primary">Accedi</button>
-                    <button type="button" id="registerBtn" class="btn btn-secondary">Registrati</button>
+                    <button type="button" id="registerBtn" class="btn btn-secondary">Registra la tua Azienda</button>
                 </form>
             </div>
         </div>
 
-        <!-- Animal Form Modal -->
-        <div id="animalModal" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>Gestisci i tuoi animali</h2>
-                <form id="animalForm">
-                    <input type="text" id="animalName" placeholder="Nome animale" required>
-                    <select id="animalType" required>
-                        <option value="">Tipo animale</option>
-                        <option value="cane">Cane</option>
-                        <option value="gatto">Gatto</option>
-                        <option value="altro">Altro</option>
-                    </select>
-                    <input type="text" id="animalBreed" placeholder="Razza">
-                    <input type="date" id="animalBirthDate" placeholder="Data di nascita">
-                    <textarea id="animalNotes" placeholder="Note speciali (allergie, comportamenti, ecc.)"></textarea>
-                    <button type="submit" class="btn btn-primary">Salva Animale</button>
-                </form>
-                <div id="animalsList" class="animals-list"></div>
-            </div>
-        </div>
-
-        <!-- Booking Modal -->
-        <div id="bookingModal" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>Nuova Prenotazione</h2>
-                <form id="bookingForm">
-                    <select id="bookingAnimal" required>
-                        <option value="">Seleziona animale</option>
-                    </select>
-                    <select id="bookingService" required>
-                        <option value="">Tipo di servizio</option>
-                        <option value="toelettatura-completa">Toelettatura Completa</option>
-                        <option value="bagno">Bagno</option>
-                        <option value="taglio-unghie">Taglio Unghie</option>
-                        <option value="pulizia-orecchie">Pulizia Orecchie</option>
-                        <option value="taglio-pelo">Taglio Pelo</option>
-                    </select>
-                    <input type="datetime-local" id="bookingDateTime" required>
-                    <textarea id="bookingNotes" placeholder="Note aggiuntive"></textarea>
-                    <div class="payment-options">
-                        <label>
-                            <input type="radio" name="payment" value="online" checked>
-                            Pagamento Online
-                        </label>
-                        <label>
-                            <input type="radio" name="payment" value="presenza">
-                            Pagamento in Presenza
-                        </label>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Conferma Prenotazione</button>
-                </form>
-            </div>
-        </div>
-
+        <!-- Hero Section -->
         <div class="hero">
-            <h2>Prenota la toelettatura per il tuo animale</h2>
-            <p>Gestisci le prenotazioni in modo semplice e veloce</p>
+            <h1>PetCalendar</h1>
+            <h2>La Piattaforma Completa per Gestire il Tuo Business di Toelettatura</h2>
+            <p>Prenotazioni, operatori, reportistica e molto altro. Tutto ciò di cui hai bisogno per far crescere la tua attività.</p>
+            <div class="hero-actions">
+                <button id="heroLoginBtn" class="btn btn-primary btn-large">Accedi alla Dashboard</button>
+                <button id="heroRegisterBtn" class="btn btn-secondary btn-large">Registra la tua Azienda</button>
+            </div>
         </div>
 
-        <div class="actions">
-            <button id="addAnimalBtn" class="btn btn-primary">+ Aggiungi Animale</button>
-            <button id="newBookingBtn" class="btn btn-primary">+ Nuova Prenotazione</button>
+        <!-- Features Section -->
+        <div class="features-section">
+            <h3>Funzionalità Professionali</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">CAL</div>
+                    <h4>Calendario Avanzato</h4>
+                    <p>Gestisci tutte le prenotazioni con un calendario interattivo e intuitivo</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">TEAM</div>
+                    <h4>Gestione Operatori</h4>
+                    <p>Assegna operatori alle prenotazioni e gestisci il tuo team</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">RPT</div>
+                    <h4>Reportistica Avanzata</h4>
+                    <p>Analizza fatturato, servizi più richiesti e performance del business</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">FIL</div>
+                    <h4>Filtri Avanzati</h4>
+                    <p>Cerca e filtra prenotazioni per operatore, servizio, stato e periodo</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">DASH</div>
+                    <h4>Dashboard Completa</h4>
+                    <p>Visualizza statistiche in tempo reale e metriche chiave del business</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">EXP</div>
+                    <h4>Export Dati</h4>
+                    <p>Esporta prenotazioni in CSV per analisi e contabilità</p>
+                </div>
+            </div>
         </div>
 
-        <div class="calendar-container">
-            <div id="calendar"></div>
+        <!-- Pricing Section -->
+        <div class="pricing-section">
+            <h3>Piani e Prezzi</h3>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h4>FREE</h4>
+                    <div class="pricing-price">€0<span>/mese</span></div>
+                    <p class="pricing-description">Perfetto per iniziare</p>
+                    <ul class="pricing-features">
+                        <li>Fino a 50 prenotazioni/mese</li>
+                        <li>Fino a 2 operatori</li>
+                        <li>1 sede</li>
+                        <li>Calendario base</li>
+                        <li>Notifiche email</li>
+                    </ul>
+                    <button class="btn btn-outline btn-large">Inizia Gratis</button>
+                </div>
+                <div class="pricing-card pricing-featured">
+                    <div class="pricing-badge">Più Popolare</div>
+                    <h4>PRO</h4>
+                    <div class="pricing-price">€69<span>/mese</span></div>
+                    <p class="pricing-description">Per aziende in crescita</p>
+                    <ul class="pricing-features">
+                        <li>Prenotazioni illimitate</li>
+                        <li>Fino a 5 operatori</li>
+                        <li>Fino a 3 sedi</li>
+                        <li>Reportistica avanzata</li>
+                        <li>Integrazione pagamenti</li>
+                        <li>SMS automatici</li>
+                        <li>Export dati</li>
+                    </ul>
+                    <button class="btn btn-primary btn-large">Scegli PRO</button>
+                </div>
+                <div class="pricing-card">
+                    <h4>ENTERPRISE</h4>
+                    <div class="pricing-price">€199<span>/mese</span></div>
+                    <p class="pricing-description">Per grandi aziende</p>
+                    <ul class="pricing-features">
+                        <li>Operatori illimitati</li>
+                        <li>Sedi illimitate</li>
+                        <li>API access</li>
+                        <li>App mobile</li>
+                        <li>Marketing automation</li>
+                        <li>White-label completo</li>
+                        <li>Supporto 24/7</li>
+                    </ul>
+                    <button class="btn btn-outline btn-large">Contattaci</button>
+                </div>
+            </div>
         </div>
 
-        <div class="bookings-list">
-            <h3>Le tue prenotazioni</h3>
-            <div id="bookingsList"></div>
+        <!-- About Section -->
+        <div class="about-section">
+            <h3>Perché Scegliere PetCalendar?</h3>
+            <div class="about-grid">
+                <div class="about-item">
+                    <h4>Facilità d'Uso</h4>
+                    <p>Interfaccia intuitiva e moderna. Inizia a usare la piattaforma in pochi minuti, senza bisogno di formazione complessa.</p>
+                </div>
+                <div class="about-item">
+                    <h4>Risparmio Tempo</h4>
+                    <p>Automatizza prenotazioni, promemoria e notifiche. Concentrati sul tuo lavoro, lasciamo che il software gestisca il resto.</p>
+                </div>
+                <div class="about-item">
+                    <h4>Dati e Reportistica</h4>
+                    <p>Analizza le performance del tuo business con report dettagliati su fatturato, servizi più richiesti e clienti.</p>
+                </div>
+                <div class="about-item">
+                    <h4>Scalabilità</h4>
+                    <p>Dalla piccola attività al grande centro. PetCalendar cresce con te, supportando da 1 a centinaia di operatori.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Section -->
+        <div class="info-section">
+            <h3>Piattaforma Dedicata alle Aziende</h3>
+            <p>PetCalendar è una soluzione B2B progettata esclusivamente per aziende di toelettatura professionale. 
+               Non è una piattaforma per clienti finali: tutte le prenotazioni vengono gestite direttamente dalla tua dashboard professionale.</p>
+            <div class="info-box">
+                <p><strong>Accesso Riservato:</strong> Solo le aziende registrate possono accedere alla dashboard. Registra la tua azienda per iniziare.</p>
+            </div>
         </div>
     </div>
 
     <script src="firebase-config.js"></script>
-    <script src="notifications.js"></script>
-    <script src="payment.js"></script>
-    <script src="app.js"></script>
     <script>
-        // Inizializza EmailJS e Stripe al caricamento
+        // Variabili globali
+        let currentUser = null;
+
+        // Inizializzazione - aspetta che Firebase sia caricato
         document.addEventListener('DOMContentLoaded', () => {
-            if (typeof emailjs !== 'undefined') {
-                initEmailJS();
+            console.log('DOM caricato, inizializzazione...');
+            
+            // Verifica che Firebase sia inizializzato
+            if (typeof firebase === 'undefined' || !firebase.auth) {
+                console.error('Firebase non è stato caricato correttamente');
+                alert('Errore: Firebase non è stato caricato. Verifica la connessione internet e ricarica la pagina.');
+                return;
             }
-            if (typeof Stripe !== 'undefined') {
-                initStripe();
+
+            console.log('Firebase caricato correttamente');
+            
+            // Verifica che auth sia disponibile
+            if (typeof auth === 'undefined') {
+                console.error('auth non è definito. Verifica che firebase-config.js sia caricato correttamente.');
+                alert('Errore: autenticazione Firebase non disponibile. Verifica che firebase-config.js sia presente e ricarica la pagina.');
+                return;
             }
+
+            console.log('Auth disponibile, inizializzazione componenti...');
+            initAuth();
+            initEventListeners();
+            
+            // Verifica se l'utente è già autenticato
+            console.log('Impostazione listener stato autenticazione...');
+            auth.onAuthStateChanged(async (user) => {
+                console.log('Stato autenticazione cambiato:', user ? 'utente loggato' : 'utente non loggato');
+                
+                if (user) {
+                    try {
+                        await user.reload();
+                        console.log('Utente ricaricato, email verificata:', user.emailVerified);
+                        
+                        // Per ora permettere l'accesso anche senza verifica email (per sviluppo)
+                        // TODO: Riattivare verifica email in produzione
+                        currentUser = user;
+                        updateUIForLoggedIn();
+                        
+                        if (!user.emailVerified) {
+                            console.warn('Email non verificata, ma accesso permesso per sviluppo');
+                        }
+                        
+                        // Reindirizza alla dashboard se già loggato
+                        console.log('Reindirizzamento a admin.html...');
+                        window.location.href = 'admin.html';
+                    } catch (error) {
+                        console.error('Errore nel controllo stato autenticazione:', error);
+                        updateUIForLoggedOut();
+                    }
+                } else {
+                    currentUser = null;
+                    updateUIForLoggedOut();
+                }
+            });
         });
+
+        function updateUIForLoggedIn() {
+            const loginBtn = document.getElementById('loginBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const dashboardLink = document.getElementById('dashboardLink');
+            
+            if (loginBtn) loginBtn.style.display = 'none';
+            if (logoutBtn) logoutBtn.style.display = 'block';
+            if (dashboardLink) dashboardLink.style.display = 'block';
+        }
+
+        function updateUIForLoggedOut() {
+            const loginBtn = document.getElementById('loginBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const dashboardLink = document.getElementById('dashboardLink');
+            
+            if (loginBtn) loginBtn.style.display = 'block';
+            if (logoutBtn) logoutBtn.style.display = 'none';
+            if (dashboardLink) dashboardLink.style.display = 'none';
+        }
+
+        // Autenticazione
+        function initAuth() {
+            // Verifica che auth sia disponibile
+            if (typeof auth === 'undefined') {
+                console.error('auth non è disponibile');
+                return;
+            }
+
+            const loginModal = document.getElementById('loginModal');
+            const loginBtn = document.getElementById('loginBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const authForm = document.getElementById('authForm');
+            const registerBtn = document.getElementById('registerBtn');
+
+            if (!loginModal || !loginBtn || !authForm || !registerBtn) {
+                console.error('Elementi DOM non trovati');
+                return;
+            }
+
+            loginBtn.addEventListener('click', () => {
+                loginModal.classList.add('show');
+            });
+
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', async () => {
+                    try {
+                        await auth.signOut();
+                        window.location.reload();
+                    } catch (error) {
+                        console.error('Errore durante il logout:', error);
+                        alert('Errore durante il logout: ' + error.message);
+                    }
+                });
+            }
+
+            authForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+
+                if (!email || !password) {
+                    alert('Inserisci email e password');
+                    return;
+                }
+
+                try {
+                    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+                    
+                    await user.reload();
+                    
+                    // Per ora permettere l'accesso anche senza verifica email (per sviluppo)
+                    // TODO: Riattivare verifica email in produzione
+                    if (!user.emailVerified) {
+                        console.warn('Email non verificata, ma accesso permesso');
+                        // Opzionale: invia email di verifica in background
+                        try {
+                            await user.sendEmailVerification();
+                            console.log('Email di verifica inviata');
+                        } catch (verificationError) {
+                            console.warn('Errore nell\'invio email di verifica:', verificationError);
+                        }
+                    }
+                    
+                    loginModal.classList.remove('show');
+                    authForm.reset();
+                    // Reindirizza alla dashboard
+                    window.location.href = 'admin.html';
+                } catch (error) {
+                    console.error('Errore durante il login:', error);
+                    let errorMessage = 'Errore durante il login';
+                    
+                    if (error.code === 'auth/user-not-found') {
+                        errorMessage = 'Utente non trovato. Verifica l\'email o registrati.';
+                    } else if (error.code === 'auth/wrong-password') {
+                        errorMessage = 'Password errata. Riprova.';
+                    } else if (error.code === 'auth/invalid-email') {
+                        errorMessage = 'Email non valida.';
+                    } else if (error.code === 'auth/too-many-requests') {
+                        errorMessage = 'Troppi tentativi. Riprova più tardi.';
+                    } else if (error.message) {
+                        errorMessage = error.message;
+                    }
+                    
+                    alert(errorMessage);
+                }
+            });
+
+            registerBtn.addEventListener('click', async () => {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+
+                if (!email || !password) {
+                    alert('Inserisci email e password');
+                    return;
+                }
+
+                if (password.length < 6) {
+                    alert('La password deve essere di almeno 6 caratteri');
+                    return;
+                }
+
+                try {
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+                    
+                    try {
+                        await user.sendEmailVerification();
+                        alert('Registrazione completata! Controlla la tua email per verificare l\'account. Dovrai effettuare il login dopo aver verificato l\'email.');
+                    } catch (verificationError) {
+                        console.warn('Errore nell\'invio email di verifica:', verificationError);
+                        alert('Registrazione completata, ma non è stato possibile inviare l\'email di verifica. Puoi richiederla più tardi dalle impostazioni.');
+                    }
+                    
+                    if (!user.emailVerified) {
+                        await auth.signOut();
+                    }
+                    
+                    loginModal.classList.remove('show');
+                    document.getElementById('authForm').reset();
+                } catch (error) {
+                    console.error('Errore durante la registrazione:', error);
+                    let errorMessage = 'Errore durante la registrazione';
+                    
+                    if (error.code === 'auth/email-already-in-use') {
+                        errorMessage = 'Questa email è già registrata. Prova ad accedere.';
+                    } else if (error.code === 'auth/invalid-email') {
+                        errorMessage = 'Email non valida.';
+                    } else if (error.code === 'auth/weak-password') {
+                        errorMessage = 'Password troppo debole. Usa almeno 6 caratteri.';
+                    } else if (error.message) {
+                        errorMessage = error.message;
+                    }
+                    
+                    alert(errorMessage);
+                }
+            });
+        }
+
+        // Event Listeners
+        function initEventListeners() {
+            // Modali
+            const modals = document.querySelectorAll('.modal');
+            const closeBtns = document.querySelectorAll('.close');
+
+            closeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.closest('.modal').classList.remove('show');
+                });
+            });
+
+            modals.forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.classList.remove('show');
+                    }
+                });
+            });
+
+            // Hero buttons
+            const heroLoginBtn = document.getElementById('heroLoginBtn');
+            const heroRegisterBtn = document.getElementById('heroRegisterBtn');
+            
+            if (heroLoginBtn) {
+                heroLoginBtn.addEventListener('click', () => {
+                    const loginModal = document.getElementById('loginModal');
+                    if (loginModal) {
+                        loginModal.classList.add('show');
+                    }
+                });
+            }
+
+            if (heroRegisterBtn) {
+                heroRegisterBtn.addEventListener('click', () => {
+                    const loginModal = document.getElementById('loginModal');
+                    if (loginModal) {
+                        loginModal.classList.add('show');
+                        // Focus sul form
+                        setTimeout(() => {
+                            const emailInput = document.getElementById('email');
+                            if (emailInput) {
+                                emailInput.focus();
+                            }
+                        }, 300);
+                    }
+                });
+            }
+        }
     </script>
 </body>
 </html>

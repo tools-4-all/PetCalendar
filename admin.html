@@ -14,13 +14,32 @@
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 </head>
 <body>
-    <nav class="navbar">
+    <nav class="navbar navbar-dashboard">
         <div class="container">
-            <h1 class="logo">🐾 PetCalendar - Dashboard</h1>
-            <div class="nav-links">
-                <a href="index.html">Prenota</a>
-                <a href="admin.html" class="active">Dashboard Professionale</a>
-                <button id="logoutBtn" class="btn btn-outline">Esci</button>
+            <h1 class="logo">PetCalendar</h1>
+            <div class="dashboard-menu">
+                <div class="menu-dropdown">
+                    <button id="menuToggleBtn" class="menu-toggle">
+                        <span class="menu-icon"></span>
+                        <span class="menu-icon"></span>
+                        <span class="menu-icon"></span>
+                    </button>
+                    <div id="menuDropdown" class="menu-dropdown-content">
+                        <a href="#" id="menuSettings" class="menu-item">
+                            <span>Impostazioni</span>
+                        </a>
+                        <a href="#" id="menuProfile" class="menu-item">
+                            <span>Profilo</span>
+                        </a>
+                        <div class="menu-divider"></div>
+                        <a href="index.html" class="menu-item">
+                            <span>Vai alla Home</span>
+                        </a>
+                        <button id="logoutBtn" class="menu-item menu-item-button">
+                            <span>Esci</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
@@ -34,17 +53,30 @@
                     <input type="date" id="selectedDate" value="">
                     <button id="todayBtn" class="btn btn-secondary">Oggi</button>
                 </div>
-                <button id="exportDataBtn" class="btn btn-outline">📊 Esporta Dati</button>
+                <button id="exportDataBtn" class="btn btn-outline">Esporta Dati</button>
             </div>
         </div>
 
         <!-- Tab Navigation -->
         <div class="admin-tabs">
-            <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
-            <button class="tab-btn" data-tab="calendar">📅 Calendario</button>
-            <button class="tab-btn" data-tab="bookings">📋 Prenotazioni</button>
-            <button class="tab-btn" data-tab="operators">👥 Operatori</button>
-            <button class="tab-btn" data-tab="reports">📈 Report</button>
+            <button class="tab-btn active" data-tab="dashboard">
+                <span class="tab-icon">Dashboard</span>
+            </button>
+            <button class="tab-btn" data-tab="calendar">
+                <span class="tab-icon">Calendario</span>
+            </button>
+            <button class="tab-btn" data-tab="bookings">
+                <span class="tab-icon">Prenotazioni</span>
+            </button>
+            <button class="tab-btn" data-tab="operators">
+                <span class="tab-icon">Operatori</span>
+            </button>
+            <button class="tab-btn" data-tab="reports">
+                <span class="tab-icon">Report</span>
+            </button>
+            <button class="tab-btn" data-tab="settings">
+                <span class="tab-icon">Impostazioni</span>
+            </button>
         </div>
 
         <!-- Dashboard Tab -->
@@ -184,6 +216,168 @@
                 <div class="report-section">
                     <h4>Performance Operatori</h4>
                     <div id="operatorsReport"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settingsTab" class="tab-content">
+            <div class="settings-container">
+                <!-- Subscription Section -->
+                <div class="settings-section">
+                    <h3>Abbonamento</h3>
+                    <div class="subscription-card">
+                        <div class="subscription-info">
+                            <div class="subscription-plan">
+                                <h4 id="currentPlanName">Piano FREE</h4>
+                                <p id="currentPlanDetails">Fino a 50 prenotazioni/mese - 2 operatori</p>
+                            </div>
+                            <div class="subscription-status">
+                                <span id="subscriptionStatus" class="status-badge status-active">Attivo</span>
+                                <p id="subscriptionExpiry">Scadenza: -</p>
+                            </div>
+                        </div>
+                        <div class="subscription-actions">
+                            <button id="upgradePlanBtn" class="btn btn-primary">Aggiorna Piano</button>
+                            <button id="manageBillingBtn" class="btn btn-outline">Gestisci Fatturazione</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Available Plans -->
+                    <div class="plans-grid">
+                        <div class="plan-card">
+                            <h4>FREE</h4>
+                            <div class="plan-price">€0<span>/mese</span></div>
+                            <ul class="plan-features">
+                                <li>Fino a 50 prenotazioni/mese</li>
+                                <li>Fino a 2 operatori</li>
+                                <li>1 sede</li>
+                                <li>Calendario base</li>
+                                <li>Notifiche email base</li>
+                            </ul>
+                            <button class="btn btn-outline plan-btn" data-plan="free">Piano Attuale</button>
+                        </div>
+                        <div class="plan-card plan-featured">
+                            <div class="plan-badge">Consigliato</div>
+                            <h4>PRO</h4>
+                            <div class="plan-price">€69<span>/mese</span></div>
+                            <ul class="plan-features">
+                                <li>Prenotazioni illimitate</li>
+                                <li>Fino a 5 operatori</li>
+                                <li>Fino a 3 sedi</li>
+                                <li>Reportistica avanzata</li>
+                                <li>Integrazione pagamenti</li>
+                                <li>SMS automatici</li>
+                                <li>Export dati</li>
+                            </ul>
+                            <button class="btn btn-primary plan-btn" data-plan="pro">Passa a PRO</button>
+                        </div>
+                        <div class="plan-card">
+                            <h4>ENTERPRISE</h4>
+                            <div class="plan-price">€199<span>/mese</span></div>
+                            <ul class="plan-features">
+                                <li>Operatori illimitati</li>
+                                <li>Sedi illimitate</li>
+                                <li>API access</li>
+                                <li>App mobile</li>
+                                <li>Marketing automation</li>
+                                <li>White-label completo</li>
+                                <li>Supporto 24/7</li>
+                            </ul>
+                            <button class="btn btn-outline plan-btn" data-plan="enterprise">Contattaci</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Company Profile Section -->
+                <div class="settings-section">
+                    <h3>Profilo Azienda</h3>
+                    <form id="companyProfileForm" class="settings-form">
+                        <div class="form-group">
+                            <label>Nome Azienda</label>
+                            <input type="text" id="companyName" placeholder="Nome della tua azienda" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Partita IVA / Codice Fiscale</label>
+                            <input type="text" id="companyVat" placeholder="P.IVA o CF">
+                        </div>
+                        <div class="form-group">
+                            <label>Indirizzo</label>
+                            <input type="text" id="companyAddress" placeholder="Via, numero civico">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Città</label>
+                                <input type="text" id="companyCity" placeholder="Città">
+                            </div>
+                            <div class="form-group">
+                                <label>CAP</label>
+                                <input type="text" id="companyZip" placeholder="CAP">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Telefono</label>
+                            <input type="tel" id="companyPhone" placeholder="Telefono">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Contatto</label>
+                            <input type="email" id="companyEmail" placeholder="Email principale">
+                        </div>
+                        <div class="form-group">
+                            <label>Sito Web</label>
+                            <input type="url" id="companyWebsite" placeholder="https://...">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Salva Modifiche</button>
+                    </form>
+                </div>
+
+                <!-- Account Settings -->
+                <div class="settings-section">
+                    <h3>Impostazioni Account</h3>
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label>Email Account</label>
+                            <input type="email" id="accountEmail" readonly>
+                            <small>L'email non può essere modificata</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Cambia Password</label>
+                            <input type="password" id="newPassword" placeholder="Nuova password (min. 6 caratteri)">
+                            <input type="password" id="confirmPassword" placeholder="Conferma password">
+                            <button id="changePasswordBtn" class="btn btn-secondary">Cambia Password</button>
+                        </div>
+                        <div class="form-group">
+                            <label>Notifiche</label>
+                            <div class="checkbox-group">
+                                <label>
+                                    <input type="checkbox" id="notifyEmail" checked>
+                                    Ricevi notifiche via email
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="notifySMS">
+                                    Ricevi notifiche via SMS
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="notifyReminders" checked>
+                                    Promemoria automatici
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="settings-section danger-zone">
+                    <h3>Area Pericolosa</h3>
+                    <div class="danger-actions">
+                        <div class="danger-item">
+                            <div>
+                                <h4>Elimina Account</h4>
+                                <p>Elimina permanentemente il tuo account e tutti i dati associati</p>
+                            </div>
+                            <button id="deleteAccountBtn" class="btn btn-danger">Elimina Account</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
