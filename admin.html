@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PetCalendar - Area Toelettatore</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/locales/it.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">🐾 PetCalendar - Admin</h1>
+            <div class="nav-links">
+                <a href="index.html">Prenota</a>
+                <a href="admin.html" class="active">Area Toelettatore</a>
+                <button id="logoutBtn" class="btn btn-outline">Esci</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-content">
+        <div class="admin-header">
+            <h2>Agenda Giornaliera</h2>
+            <div class="date-selector">
+                <input type="date" id="selectedDate" value="">
+                <button id="todayBtn" class="btn btn-secondary">Oggi</button>
+            </div>
+        </div>
+
+        <div class="calendar-container">
+            <div id="adminCalendar"></div>
+        </div>
+
+        <div class="admin-stats">
+            <div class="stat-card">
+                <h3 id="todayBookings">0</h3>
+                <p>Prenotazioni Oggi</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="pendingBookings">0</h3>
+                <p>In Attesa</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="completedBookings">0</h3>
+                <p>Completate</p>
+            </div>
+        </div>
+
+        <div class="bookings-list">
+            <h3>Prenotazioni del Giorno</h3>
+            <div id="adminBookingsList"></div>
+        </div>
+
+        <!-- Booking Detail Modal -->
+        <div id="bookingDetailModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Dettagli Prenotazione</h2>
+                <div id="bookingDetails"></div>
+                <div class="booking-actions">
+                    <button id="confirmBookingBtn" class="btn btn-success">Conferma</button>
+                    <button id="completeBookingBtn" class="btn btn-primary">Completa</button>
+                    <button id="cancelBookingBtn" class="btn btn-danger">Annulla</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="notifications.js"></script>
+    <script src="admin.js"></script>
+    <script>
+        // Inizializza EmailJS al caricamento
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof emailjs !== 'undefined') {
+                initEmailJS();
+            }
+        });
+    </script>
+</body>
+</html>
+

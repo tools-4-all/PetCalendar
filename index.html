@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PetCalendar - Prenotazioni Toelettatura</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/locales/it.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">🐾 PetCalendar</h1>
+            <div class="nav-links">
+                <a href="index.html" class="active">Prenota</a>
+                <a href="admin.html">Area Toelettatore</a>
+                <button id="loginBtn" class="btn btn-outline">Accedi</button>
+                <button id="logoutBtn" class="btn btn-outline" style="display: none;">Esci</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-content">
+        <!-- Login Modal -->
+        <div id="loginModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Accedi o Registrati</h2>
+                <form id="authForm">
+                    <input type="email" id="email" placeholder="Email" required>
+                    <input type="password" id="password" placeholder="Password" required>
+                    <button type="submit" class="btn btn-primary">Accedi</button>
+                    <button type="button" id="registerBtn" class="btn btn-secondary">Registrati</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Animal Form Modal -->
+        <div id="animalModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Gestisci i tuoi animali</h2>
+                <form id="animalForm">
+                    <input type="text" id="animalName" placeholder="Nome animale" required>
+                    <select id="animalType" required>
+                        <option value="">Tipo animale</option>
+                        <option value="cane">Cane</option>
+                        <option value="gatto">Gatto</option>
+                        <option value="altro">Altro</option>
+                    </select>
+                    <input type="text" id="animalBreed" placeholder="Razza">
+                    <input type="date" id="animalBirthDate" placeholder="Data di nascita">
+                    <textarea id="animalNotes" placeholder="Note speciali (allergie, comportamenti, ecc.)"></textarea>
+                    <button type="submit" class="btn btn-primary">Salva Animale</button>
+                </form>
+                <div id="animalsList" class="animals-list"></div>
+            </div>
+        </div>
+
+        <!-- Booking Modal -->
+        <div id="bookingModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Nuova Prenotazione</h2>
+                <form id="bookingForm">
+                    <select id="bookingAnimal" required>
+                        <option value="">Seleziona animale</option>
+                    </select>
+                    <select id="bookingService" required>
+                        <option value="">Tipo di servizio</option>
+                        <option value="toelettatura-completa">Toelettatura Completa</option>
+                        <option value="bagno">Bagno</option>
+                        <option value="taglio-unghie">Taglio Unghie</option>
+                        <option value="pulizia-orecchie">Pulizia Orecchie</option>
+                        <option value="taglio-pelo">Taglio Pelo</option>
+                    </select>
+                    <input type="datetime-local" id="bookingDateTime" required>
+                    <textarea id="bookingNotes" placeholder="Note aggiuntive"></textarea>
+                    <div class="payment-options">
+                        <label>
+                            <input type="radio" name="payment" value="online" checked>
+                            Pagamento Online
+                        </label>
+                        <label>
+                            <input type="radio" name="payment" value="presenza">
+                            Pagamento in Presenza
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Conferma Prenotazione</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="hero">
+            <h2>Prenota la toelettatura per il tuo animale</h2>
+            <p>Gestisci le prenotazioni in modo semplice e veloce</p>
+        </div>
+
+        <div class="actions">
+            <button id="addAnimalBtn" class="btn btn-primary">+ Aggiungi Animale</button>
+            <button id="newBookingBtn" class="btn btn-primary">+ Nuova Prenotazione</button>
+        </div>
+
+        <div class="calendar-container">
+            <div id="calendar"></div>
+        </div>
+
+        <div class="bookings-list">
+            <h3>Le tue prenotazioni</h3>
+            <div id="bookingsList"></div>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="notifications.js"></script>
+    <script src="payment.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Inizializza EmailJS e Stripe al caricamento
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof emailjs !== 'undefined') {
+                initEmailJS();
+            }
+            if (typeof Stripe !== 'undefined') {
+                initStripe();
+            }
+        });
+    </script>
+</body>
+</html>
+

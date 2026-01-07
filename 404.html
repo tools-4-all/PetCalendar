@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Pagina non trovata</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .error-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+            text-align: center;
+            color: var(--white);
+        }
+        .error-container h1 {
+            font-size: 6rem;
+            margin-bottom: 1rem;
+        }
+        .error-container p {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">🐾 PetCalendar</h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="admin.html">Area Toelettatore</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="error-container">
+            <h1>404</h1>
+            <p>Ops! La pagina che stai cercando non esiste.</p>
+            <a href="index.html" class="btn btn-primary">Torna alla Home</a>
+        </div>
+    </div>
+</body>
+</html>
+
