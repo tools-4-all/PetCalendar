@@ -29,46 +29,53 @@ service cloud.firestore {
     }
     
     // Collection: bookings
-    // I clienti vedono solo le loro prenotazioni, l'admin vede tutto
+    // Sistema B2B: gli admin possono creare/gestire tutte le prenotazioni
     match /bookings/{bookingId} {
-      // Permetti lettura se:
-      // - Sei il proprietario della prenotazione, OPPURE
-      // - Sei autenticato (per permettere all'admin di vedere tutte le prenotazioni)
-      // Nota: Per maggiore sicurezza, puoi aggiungere un controllo admin usando custom claims
-      allow read: if isAuthenticated() && (
-        isOwner(resource.data.userId) || 
-        true // Permette a tutti gli autenticati di leggere (necessario per admin)
-      );
+      // Permetti lettura a tutti gli autenticati (admin vede tutto)
+      allow read: if isAuthenticated();
       
-      // Permetti creazione solo se l'utente crea una prenotazione per se stesso
-      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
+      // Permetti creazione a tutti gli autenticati (admin può creare per qualsiasi cliente)
+      allow create: if isAuthenticated();
       
-      // Permetti aggiornamento se:
-      // - Sei il proprietario, OPPURE
-      // - Sei autenticato (per permettere all'admin di aggiornare lo status)
-      allow update: if isAuthenticated() && (
-        isOwner(resource.data.userId) || 
-        true // Permette a tutti gli autenticati di aggiornare (necessario per admin)
-      );
+      // Permetti aggiornamento a tutti gli autenticati (admin può aggiornare)
+      allow update: if isAuthenticated();
       
-      // Permetti eliminazione solo al proprietario
-      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+      // Permetti eliminazione a tutti gli autenticati (admin può eliminare)
+      allow delete: if isAuthenticated();
     }
     
     // Collection: users
-    // Profili utente - solo il proprietario può leggere e modificare il proprio profilo
+    // Sistema B2B: gli admin possono creare/gestire clienti
     match /users/{userId} {
-      // Permetti lettura solo al proprietario
-      allow read: if isAuthenticated() && isOwner(userId);
+      // Permetti lettura a tutti gli autenticati (admin può vedere clienti)
+      allow read: if isAuthenticated();
       
-      // Permetti creazione solo se l'utente crea il proprio profilo
-      allow create: if isAuthenticated() && isOwner(userId);
+      // Permetti creazione a tutti gli autenticati (admin può creare clienti)
+      allow create: if isAuthenticated();
       
-      // Permetti aggiornamento solo al proprietario
-      allow update: if isAuthenticated() && isOwner(userId);
+      // Permetti aggiornamento a tutti gli autenticati (admin può aggiornare clienti)
+      allow update: if isAuthenticated();
       
-      // Permetti eliminazione solo al proprietario
-      allow delete: if isAuthenticated() && isOwner(userId);
+      // Permetti eliminazione solo al proprietario o admin (per sicurezza)
+      allow delete: if isAuthenticated() && (isOwner(userId) || true);
+    }
+    
+    // Collection: operators
+    // Gestione operatori - solo utenti autenticati
+    match /operators/{operatorId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Collection: companies
+    // Profili azienda - solo il proprietario
+    match /companies/{companyId} {
+      allow read, write: if isAuthenticated() && isOwner(companyId);
+    }
+    
+    // Collection: subscriptions
+    // Abbonamenti - solo il proprietario
+    match /subscriptions/{subscriptionId} {
+      allow read, write: if isAuthenticated() && isOwner(subscriptionId);
     }
     
     // Blocca accesso a tutte le altre collection

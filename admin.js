@@ -213,7 +213,8 @@ function initTabs() {
             if (targetTab === 'bookings') {
                 loadAllBookings();
             } else if (targetTab === 'reports') {
-                generateReport();
+                // Non generare automaticamente il report - solo quando si clicca sul bottone
+                // Il report verrà generato solo quando l'utente clicca su "Genera Report"
             } else if (targetTab === 'settings') {
                 loadSettings();
             }
@@ -306,6 +307,16 @@ function initEventListeners() {
         await saveOperator();
     });
 
+    // Prenotazioni
+    document.getElementById('addBookingBtn')?.addEventListener('click', () => {
+        openAddBookingModal();
+    });
+
+    document.getElementById('addBookingForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await createAdminBooking();
+    });
+
     // Reports
     document.getElementById('reportPeriod')?.addEventListener('change', (e) => {
         const customPeriod = document.getElementById('customPeriod');
@@ -318,6 +329,14 @@ function initEventListeners() {
 
     document.getElementById('generateReportBtn')?.addEventListener('click', () => {
         generateReport();
+    });
+    
+    // Mostra/nascondi periodo personalizzato
+    document.getElementById('reportPeriod')?.addEventListener('change', (e) => {
+        const customPeriod = document.getElementById('customPeriod');
+        if (customPeriod) {
+            customPeriod.style.display = e.target.value === 'custom' ? 'block' : 'none';
+        }
     });
 
     // Export
@@ -497,10 +516,11 @@ function createAdminBookingCard(booking) {
             <h4>${booking.animalName} (${booking.animalType})</h4>
             <span class="booking-status ${booking.status}">${booking.status}</span>
         </div>
+        <p><strong>Cliente:</strong> ${booking.userName || booking.userEmail || 'N/A'}</p>
         <p><strong>Servizio:</strong> ${serviceNames[booking.service] || booking.service}</p>
+        <p><strong>Prezzo:</strong> €${(booking.price || 0).toFixed(2)}</p>
         <p><strong>Orario:</strong> ${date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</p>
-        <p><strong>Cliente:</strong> ${booking.userEmail}</p>
-        <p><strong>Pagamento:</strong> ${booking.paymentMethod === 'online' ? 'Online ✓' : 'In Presenza'}</p>
+        <p><strong>Pagamento:</strong> In Presenza</p>
     `;
 
     return card;
@@ -539,39 +559,49 @@ async function showBookingDetail(bookingId) {
 
         details.innerHTML = `
             <div class="detail-row">
+                <span class="detail-label">Cliente:</span>
+                <span class="detail-value">${booking.userName || booking.userEmail || 'N/A'}</span>
+            </div>
+            ${booking.userEmail ? `
+            <div class="detail-row">
+                <span class="detail-label">Email:</span>
+                <span class="detail-value">${booking.userEmail}</span>
+            </div>
+            ` : ''}
+            ${booking.userPhone ? `
+            <div class="detail-row">
+                <span class="detail-label">Telefono:</span>
+                <span class="detail-value">${booking.userPhone}</span>
+            </div>
+            ` : ''}
+            <div class="detail-row">
                 <span class="detail-label">Animale:</span>
                 <span class="detail-value">${booking.animalName} (${booking.animalType})</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Razza:</span>
-                <span class="detail-value">${animalData.breed || 'N/A'}</span>
+                <span class="detail-value">${animalData.breed || booking.animalBreed || 'N/A'}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Servizio:</span>
                 <span class="detail-value">${serviceNames[booking.service] || booking.service}</span>
             </div>
             <div class="detail-row">
+                <span class="detail-label">Prezzo:</span>
+                <span class="detail-value">€${(booking.price || 0).toFixed(2)}</span>
+            </div>
+            <div class="detail-row">
                 <span class="detail-label">Data e Ora:</span>
                 <span class="detail-value">${date.toLocaleString('it-IT')}</span>
             </div>
             <div class="detail-row">
-                <span class="detail-label">Cliente:</span>
-                <span class="detail-value">${booking.userEmail}</span>
-            </div>
-            <div class="detail-row">
                 <span class="detail-label">Pagamento:</span>
-                <span class="detail-value">${booking.paymentMethod === 'online' ? 'Online' : 'In Presenza'}</span>
+                <span class="detail-value">In Presenza</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Stato:</span>
                 <span class="detail-value"><span class="booking-status ${booking.status}">${booking.status}</span></span>
             </div>
-            ${animalData.notes ? `
-            <div class="detail-row">
-                <span class="detail-label">Note Animale:</span>
-                <span class="detail-value">${animalData.notes}</span>
-            </div>
-            ` : ''}
             ${booking.notes ? `
             <div class="detail-row">
                 <span class="detail-label">Note Prenotazione:</span>
@@ -738,119 +768,148 @@ function loadAllBookings() {
     }
 }
 
-// Statistiche avanzate
-async function loadAdvancedStats() {
+// Statistiche avanzate - usa listener per aggiornamento automatico
+let advancedStatsUnsubscribe = null;
+
+function loadAdvancedStats() {
+    // Disconnetti il listener precedente se esiste
+    if (advancedStatsUnsubscribe) {
+        advancedStatsUnsubscribe();
+    }
+
     try {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        startOfMonth.setHours(0, 0, 0, 0);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
         
-        // Fatturato mensile (stima basata su prenotazioni completate)
-        const completedBookings = await db.collection('bookings')
-            .where('status', '==', 'completed')
-            .where('dateTime', '>=', firebase.firestore.Timestamp.fromDate(startOfMonth))
-            .where('dateTime', '<=', firebase.firestore.Timestamp.fromDate(endOfMonth))
-            .get();
-        
-        const servicePrices = {
-            'toelettatura-completa': 50,
-            'bagno': 25,
-            'taglio-unghie': 15,
-            'pulizia-orecchie': 10,
-            'taglio-pelo': 40
-        };
-        
-        let revenue = 0;
-        const serviceCounts = {};
-        const clientCounts = {};
-        
-        completedBookings.forEach(doc => {
-            const booking = doc.data();
-            const price = servicePrices[booking.service] || 30;
-            revenue += price;
-            
-            // Conta servizi
-            serviceCounts[booking.service] = (serviceCounts[booking.service] || 0) + 1;
-            
-            // Conta clienti
-            clientCounts[booking.userEmail] = (clientCounts[booking.userEmail] || 0) + 1;
-        });
-        
-        document.getElementById('monthlyRevenue').textContent = `€${revenue}`;
-        
-        // Clienti totali
-        const uniqueClients = Object.keys(clientCounts).length;
-        document.getElementById('totalClients').textContent = uniqueClients;
-        
-        // Servizi più richiesti
-        const popularServicesEl = document.getElementById('popularServices');
-        if (popularServicesEl) {
-            const sortedServices = Object.entries(serviceCounts)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5);
-            
-            const serviceNames = {
-                'toelettatura-completa': 'Toelettatura Completa',
-                'bagno': 'Bagno',
-                'taglio-unghie': 'Taglio Unghie',
-                'pulizia-orecchie': 'Pulizia Orecchie',
-                'taglio-pelo': 'Taglio Pelo'
-            };
-            
-            popularServicesEl.innerHTML = sortedServices.length > 0 
-                ? `<ul>${sortedServices.map(([service, count]) => 
-                    `<li><span>${serviceNames[service] || service}</span><span>${count}</span></li>`
-                ).join('')}</ul>`
-                : '<p>Nessun dato disponibile</p>';
-        }
-        
-        // Clienti più frequenti
-        const topClientsEl = document.getElementById('topClients');
-        if (topClientsEl) {
-            const sortedClients = Object.entries(clientCounts)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5);
-            
-            topClientsEl.innerHTML = sortedClients.length > 0
-                ? `<ul>${sortedClients.map(([email, count]) => 
-                    `<li><span>${email}</span><span>${count} prenotazioni</span></li>`
-                ).join('')}</ul>`
-                : '<p>Nessun dato disponibile</p>';
-        }
-        
-        // Prossime prenotazioni
-        const nextWeek = new Date();
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        
-        const upcomingBookings = await db.collection('bookings')
-            .where('dateTime', '>=', firebase.firestore.Timestamp.fromDate(now))
-            .where('dateTime', '<=', firebase.firestore.Timestamp.fromDate(nextWeek))
-            .where('status', 'in', ['pending', 'confirmed'])
-            .orderBy('dateTime', 'asc')
-            .limit(5)
-            .get();
-        
-        const upcomingEl = document.getElementById('upcomingBookings');
-        if (upcomingEl) {
-            if (!upcomingBookings.empty) {
-                const serviceNames = {
-                    'toelettatura-completa': 'Toelettatura Completa',
-                    'bagno': 'Bagno',
-                    'taglio-unghie': 'Taglio Unghie',
-                    'pulizia-orecchie': 'Pulizia Orecchie',
-                    'taglio-pelo': 'Taglio Pelo'
-                };
-                
-                upcomingEl.innerHTML = `<ul>${Array.from(upcomingBookings.docs).map(doc => {
+        // Usa listener in tempo reale invece di query una tantum
+        advancedStatsUnsubscribe = db.collection('bookings')
+            .orderBy('dateTime', 'desc')
+            .onSnapshot((snapshot) => {
+                // Filtra per mese corrente
+                const monthlyBookings = snapshot.docs.filter(doc => {
                     const booking = doc.data();
-                    const date = timestampToDate(booking.dateTime);
-                    return `<li><span>${date.toLocaleDateString('it-IT')} - ${booking.animalName}</span><span>${serviceNames[booking.service] || booking.service}</span></li>`;
-                }).join('')}</ul>`;
-            } else {
-                upcomingEl.innerHTML = '<p>Nessuna prenotazione nei prossimi 7 giorni</p>';
-            }
-        }
+                    const bookingDate = booking.dateTime?.toDate();
+                    if (!bookingDate) return false;
+                    return bookingDate >= startOfMonth && bookingDate <= endOfMonth;
+                });
+                
+                let revenue = 0;
+                let revenueCompleted = 0;
+                const serviceCounts = {};
+                const clientCounts = {};
+                
+                monthlyBookings.forEach(doc => {
+                    const booking = doc.data();
+                    const price = booking.price || 0;
+                    const status = booking.status || 'pending';
+                    const service = booking.service || 'unknown';
+                    
+                    // Fatturato reale (solo completate)
+                    if (status === 'completed') {
+                        revenueCompleted += price;
+                    }
+                    
+                    // Fatturato totale (completate + confermate) - per mostrare anche le prenotazioni confermate
+                    if (status === 'completed' || status === 'confirmed') {
+                        revenue += price;
+                    }
+                    
+                    // Conta servizi per TUTTE le prenotazioni (non solo completate) per mostrare i servizi più richiesti
+                    serviceCounts[service] = (serviceCounts[service] || 0) + 1;
+                    
+                    // Conta clienti (solo completate per statistiche clienti)
+                    if (status === 'completed') {
+                        const clientKey = booking.userName || booking.userEmail || 'Sconosciuto';
+                        clientCounts[clientKey] = (clientCounts[clientKey] || 0) + 1;
+                    }
+                });
+                
+                // Mostra fatturato totale (completate + confermate) per includere anche le prenotazioni passate confermate
+                const revenueEl = document.getElementById('monthlyRevenue');
+                if (revenueEl) {
+                    revenueEl.textContent = `€${revenue.toFixed(2)}`;
+                }
+                
+                // Clienti totali
+                const uniqueClients = Object.keys(clientCounts).length;
+                const totalClientsEl = document.getElementById('totalClients');
+                if (totalClientsEl) {
+                    totalClientsEl.textContent = uniqueClients;
+                }
+                
+                // Servizi più richiesti
+                const popularServicesEl = document.getElementById('popularServices');
+                if (popularServicesEl) {
+                    const sortedServices = Object.entries(serviceCounts)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 5);
+                    
+                    const serviceNames = {
+                        'toelettatura-completa': 'Toelettatura Completa',
+                        'bagno': 'Bagno',
+                        'taglio-unghie': 'Taglio Unghie',
+                        'pulizia-orecchie': 'Pulizia Orecchie',
+                        'taglio-pelo': 'Taglio Pelo'
+                    };
+                    
+                    popularServicesEl.innerHTML = sortedServices.length > 0 
+                        ? `<ul>${sortedServices.map(([service, count]) => 
+                            `<li><span>${serviceNames[service] || service}</span><span>${count}</span></li>`
+                        ).join('')}</ul>`
+                        : '<p>Nessun dato disponibile</p>';
+                }
+                
+                // Clienti più frequenti
+                const topClientsEl = document.getElementById('topClients');
+                if (topClientsEl) {
+                    const sortedClients = Object.entries(clientCounts)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 5);
+                    
+                    topClientsEl.innerHTML = sortedClients.length > 0
+                        ? `<ul>${sortedClients.map(([email, count]) => 
+                            `<li><span>${email}</span><span>${count} prenotazioni</span></li>`
+                        ).join('')}</ul>`
+                        : '<p>Nessun dato disponibile</p>';
+                }
         
+                // Prossime prenotazioni
+                const nextWeek = new Date();
+                nextWeek.setDate(nextWeek.getDate() + 7);
+                
+                const upcoming = monthlyBookings
+                    .filter(doc => {
+                        const booking = doc.data();
+                        const bookingDate = booking.dateTime?.toDate();
+                        return bookingDate && bookingDate > now && bookingDate <= nextWeek && (booking.status === 'pending' || booking.status === 'confirmed');
+                    })
+                    .slice(0, 5);
+                
+                const upcomingEl = document.getElementById('upcomingBookings');
+                if (upcomingEl) {
+                    if (upcoming.length > 0) {
+                        const serviceNames = {
+                            'toelettatura-completa': 'Toelettatura Completa',
+                            'bagno': 'Bagno',
+                            'taglio-unghie': 'Taglio Unghie',
+                            'pulizia-orecchie': 'Pulizia Orecchie',
+                            'taglio-pelo': 'Taglio Pelo'
+                        };
+                        
+                        upcomingEl.innerHTML = `<ul>${upcoming.map(doc => {
+                            const booking = doc.data();
+                            const date = booking.dateTime?.toDate();
+                            return `<li><span>${date ? date.toLocaleDateString('it-IT') : 'N/A'} - ${booking.animalName}</span><span>${serviceNames[booking.service] || booking.service}</span></li>`;
+                        }).join('')}</ul>`;
+                    } else {
+                        upcomingEl.innerHTML = '<p>Nessuna prenotazione nei prossimi 7 giorni</p>';
+                    }
+                }
+            }, (error) => {
+                console.error('Errore nel listener statistiche avanzate:', error);
+            });
     } catch (error) {
         console.error('Errore nel caricamento statistiche avanzate:', error);
     }
@@ -976,39 +1035,63 @@ async function generateReport() {
         case 'week':
             startDate = new Date(now);
             startDate.setDate(startDate.getDate() - 7);
-            endDate = now;
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(now);
+            endDate.setHours(23, 59, 59, 999);
             break;
         case 'month':
             startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            startDate.setHours(0, 0, 0, 0);
             endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
             break;
         case 'quarter':
             startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-            endDate = now;
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(now);
+            endDate.setHours(23, 59, 59, 999);
             break;
         case 'year':
             startDate = new Date(now.getFullYear(), 0, 1);
+            startDate.setHours(0, 0, 0, 0);
             endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
             break;
         case 'custom':
-            startDate = new Date(document.getElementById('reportStartDate').value);
-            endDate = new Date(document.getElementById('reportEndDate').value);
+            const startInput = document.getElementById('reportStartDate').value;
+            const endInput = document.getElementById('reportEndDate').value;
+            if (!startInput || !endInput) {
+                alert('Seleziona data inizio e data fine per il periodo personalizzato');
+                return;
+            }
+            startDate = new Date(startInput);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(endInput);
+            endDate.setHours(23, 59, 59, 999);
             break;
+        default:
+            alert('Seleziona un periodo valido');
+            return;
+    }
+    
+    if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        alert('Date non valide. Seleziona un periodo valido.');
+        return;
     }
     
     try {
-        const bookings = await db.collection('bookings')
-            .where('dateTime', '>=', firebase.firestore.Timestamp.fromDate(startDate))
-            .where('dateTime', '<=', firebase.firestore.Timestamp.fromDate(endDate))
-            .get();
+        console.log('Generazione report per periodo:', startDate, 'a', endDate);
         
-        const servicePrices = {
-            'toelettatura-completa': 50,
-            'bagno': 25,
-            'taglio-unghie': 15,
-            'pulizia-orecchie': 10,
-            'taglio-pelo': 40
-        };
+        // Carica tutte le prenotazioni senza orderBy per evitare problemi con indici
+        const allBookingsSnapshot = await db.collection('bookings').get();
+        
+        // Filtra per periodo
+        const bookings = allBookingsSnapshot.docs.filter(doc => {
+            const booking = doc.data();
+            const bookingDate = booking.dateTime?.toDate();
+            if (!bookingDate) return false;
+            return bookingDate >= startDate && bookingDate <= endDate;
+        });
+        
+        console.log('Prenotazioni trovate:', bookings.length);
         
         const serviceNames = {
             'toelettatura-completa': 'Toelettatura Completa',
@@ -1019,21 +1102,31 @@ async function generateReport() {
         };
         
         let totalRevenue = 0;
+        let totalRevenueConfirmed = 0; // Include anche confermate
         const serviceStats = {};
         const statusCounts = { pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
         
         bookings.forEach(doc => {
             const booking = doc.data();
-            statusCounts[booking.status] = (statusCounts[booking.status] || 0) + 1;
+            const status = booking.status || 'pending';
+            const price = booking.price || 0;
             
-            if (booking.status === 'completed') {
-                const price = servicePrices[booking.service] || 30;
+            statusCounts[status] = (statusCounts[status] || 0) + 1;
+            
+            // Fatturato solo completate
+            if (status === 'completed') {
                 totalRevenue += price;
                 
-                serviceStats[booking.service] = {
-                    count: (serviceStats[booking.service]?.count || 0) + 1,
-                    revenue: (serviceStats[booking.service]?.revenue || 0) + price
+                const service = booking.service || 'unknown';
+                serviceStats[service] = {
+                    count: (serviceStats[service]?.count || 0) + 1,
+                    revenue: (serviceStats[service]?.revenue || 0) + price
                 };
+            }
+            
+            // Fatturato totale (completate + confermate)
+            if (status === 'completed' || status === 'confirmed') {
+                totalRevenueConfirmed += price;
             }
         });
         
@@ -1041,28 +1134,35 @@ async function generateReport() {
         const revenueEl = document.getElementById('revenueReport');
         if (revenueEl) {
             revenueEl.innerHTML = `
-                <p><strong>Fatturato Totale:</strong> €${totalRevenue}</p>
-                <p><strong>Prenotazioni Completate:</strong> ${statusCounts.completed}</p>
-                <p><strong>Prenotazioni Confermate:</strong> ${statusCounts.confirmed}</p>
-                <p><strong>In Attesa:</strong> ${statusCounts.pending}</p>
-                <p><strong>Annullate:</strong> ${statusCounts.cancelled}</p>
+                <div class="report-summary">
+                    <p><strong>Fatturato Completate:</strong> €${totalRevenue.toFixed(2)}</p>
+                    <p><strong>Fatturato Totale (Completate + Confermate):</strong> €${totalRevenueConfirmed.toFixed(2)}</p>
+                    <p><strong>Prenotazioni Totali:</strong> ${bookings.length}</p>
+                    <p><strong>Prenotazioni Completate:</strong> ${statusCounts.completed}</p>
+                    <p><strong>Prenotazioni Confermate:</strong> ${statusCounts.confirmed}</p>
+                    <p><strong>In Attesa:</strong> ${statusCounts.pending}</p>
+                    <p><strong>Annullate:</strong> ${statusCounts.cancelled}</p>
+                </div>
             `;
+        } else {
+            console.error('Elemento revenueReport non trovato nel DOM');
+            alert('Errore: elemento revenueReport non trovato');
         }
         
         // Report Servizi
         const servicesEl = document.getElementById('servicesReport');
         if (servicesEl) {
-            const servicesHtml = Object.entries(serviceStats)
-                .map(([service, stats]) => `
-                    <tr>
-                        <td>${serviceNames[service] || service}</td>
-                        <td>${stats.count}</td>
-                        <td>€${stats.revenue}</td>
-                    </tr>
-                `).join('');
-            
-            servicesEl.innerHTML = servicesHtml 
-                ? `<table class="report-table">
+            if (Object.keys(serviceStats).length > 0) {
+                const servicesHtml = Object.entries(serviceStats)
+                    .map(([service, stats]) => `
+                        <tr>
+                            <td>${serviceNames[service] || service}</td>
+                            <td>${stats.count}</td>
+                            <td>€${stats.revenue.toFixed(2)}</td>
+                        </tr>
+                    `).join('');
+                
+                servicesEl.innerHTML = `<table class="report-table">
                     <thead>
                         <tr>
                             <th>Servizio</th>
@@ -1071,19 +1171,340 @@ async function generateReport() {
                         </tr>
                     </thead>
                     <tbody>${servicesHtml}</tbody>
-                </table>`
-                : '<p>Nessun dato disponibile per il periodo selezionato</p>';
+                </table>`;
+            } else {
+                servicesEl.innerHTML = '<p>Nessun servizio completato nel periodo selezionato</p>';
+            }
+        } else {
+            console.error('Elemento servicesReport non trovato');
         }
         
-        // Report Operatori (placeholder)
-        const operatorsEl = document.getElementById('operatorsReport');
-        if (operatorsEl) {
-            operatorsEl.innerHTML = '<p>Funzionalità in sviluppo. I dati degli operatori verranno mostrati qui.</p>';
+        console.log('Report generato con successo');
+        console.log('Fatturato:', totalRevenue, 'Fatturato Totale:', totalRevenueConfirmed);
+        console.log('Statistiche servizi:', serviceStats);
+        
+        // Genera PDF e CSV
+        await generatePDFReport(bookings, totalRevenue, totalRevenueConfirmed, statusCounts, serviceStats, serviceNames, startDate, endDate);
+        generateCSVReport(bookings, totalRevenue, totalRevenueConfirmed, statusCounts, serviceStats, serviceNames, startDate, endDate);
+        
+        // Mostra messaggio di successo
+        const reportBtn = document.getElementById('generateReportBtn');
+        if (reportBtn) {
+            const originalText = reportBtn.textContent;
+            reportBtn.textContent = 'Report Generato!';
+            reportBtn.style.backgroundColor = 'var(--success-color)';
+            setTimeout(() => {
+                reportBtn.textContent = originalText;
+                reportBtn.style.backgroundColor = '';
+            }, 2000);
         }
         
     } catch (error) {
         console.error('Errore nella generazione report:', error);
+        console.error('Stack:', error.stack);
         alert('Errore nella generazione del report: ' + error.message);
+    }
+}
+
+// Genera PDF del Report
+async function generatePDFReport(bookings, totalRevenue, totalRevenueConfirmed, statusCounts, serviceStats, serviceNames, startDate, endDate) {
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Colori
+        const primaryColor = [30, 64, 175]; // #1e40af
+        const secondaryColor = [13, 148, 136]; // #0d9488
+        const lightGray = [249, 250, 251]; // #f9fafb
+        const darkGray = [31, 41, 55]; // #1f2937
+        
+        // HEADER con box colorato
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, 0, 210, 40, 'F');
+        
+        // Titolo
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(24);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Report Vendite e Servizi', 105, 20, { align: 'center' });
+        
+        // Periodo e data
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        const periodText = `${startDate.toLocaleDateString('it-IT')} - ${endDate.toLocaleDateString('it-IT')}`;
+        doc.text(periodText, 105, 30, { align: 'center' });
+        doc.text(`Generato il: ${new Date().toLocaleDateString('it-IT')}`, 105, 36, { align: 'center' });
+        
+        let yPos = 55;
+        doc.setTextColor(...darkGray);
+        
+        // BOX FATTURATO
+        doc.setFillColor(...lightGray);
+        doc.roundedRect(10, yPos, 190, 50, 3, 3, 'F');
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(10, yPos, 190, 50, 3, 3);
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...primaryColor);
+        doc.text('Fatturato', 15, yPos + 8);
+        
+        yPos += 12;
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...darkGray);
+        
+        // Fatturato principale in evidenza
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...secondaryColor);
+        doc.setFontSize(13);
+        doc.text(`€${totalRevenueConfirmed.toFixed(2)}`, 180, yPos, { align: 'right' });
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...darkGray);
+        doc.text('Fatturato Totale (Completate + Confermate):', 15, yPos);
+        
+        yPos += 8;
+        doc.text(`Fatturato Completate: €${totalRevenue.toFixed(2)}`, 15, yPos);
+        yPos += 6;
+        doc.text(`Prenotazioni Totali: ${bookings.length}`, 15, yPos);
+        yPos += 6;
+        doc.setFontSize(9);
+        doc.text(`Completate: ${statusCounts.completed} | Confermate: ${statusCounts.confirmed} | In Attesa: ${statusCounts.pending} | Annullate: ${statusCounts.cancelled}`, 15, yPos);
+        
+        yPos += 20;
+        
+        // STATISTICHE SERVIZI con tabella migliorata
+        if (Object.keys(serviceStats).length > 0) {
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...primaryColor);
+            doc.text('Statistiche Servizi', 15, yPos);
+            yPos += 8;
+            
+            // Header tabella con background colorato
+            doc.setFillColor(...primaryColor);
+            doc.roundedRect(10, yPos - 5, 190, 8, 2, 2, 'F');
+            
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.text('Servizio', 15, yPos);
+            doc.text('Quantità', 120, yPos);
+            doc.text('Fatturato', 170, yPos, { align: 'right' });
+            
+            yPos += 10;
+            doc.setTextColor(...darkGray);
+            doc.setFont('helvetica', 'normal');
+            
+            let rowIndex = 0;
+            Object.entries(serviceStats)
+                .sort((a, b) => b[1].revenue - a[1].revenue)
+                .forEach(([service, stats]) => {
+                    if (yPos > 270) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                    
+                    // Alternanza colori righe
+                    if (rowIndex % 2 === 0) {
+                        doc.setFillColor(249, 250, 251);
+                        doc.rect(10, yPos - 4, 190, 7, 'F');
+                    }
+                    
+                    doc.setFontSize(10);
+                    doc.setTextColor(...darkGray);
+                    doc.text(serviceNames[service] || service, 15, yPos);
+                    doc.text(stats.count.toString(), 120, yPos);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(...secondaryColor);
+                    doc.text(`€${stats.revenue.toFixed(2)}`, 190, yPos, { align: 'right' });
+                    doc.setFont('helvetica', 'normal');
+                    
+                    yPos += 7;
+                    rowIndex++;
+                });
+        }
+        
+        // DETTAGLIO VENDITE
+        if (bookings.length > 0) {
+            doc.addPage();
+            yPos = 20;
+            
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...primaryColor);
+            doc.text('Dettaglio Vendite', 15, yPos);
+            yPos += 8;
+            
+            // Header tabella
+            doc.setFillColor(...primaryColor);
+            doc.roundedRect(10, yPos - 5, 190, 8, 2, 2, 'F');
+            
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.text('Data', 12, yPos);
+            doc.text('Cliente', 50, yPos);
+            doc.text('Servizio', 110, yPos);
+            doc.text('Prezzo', 160, yPos, { align: 'right' });
+            doc.text('Stato', 185, yPos, { align: 'right' });
+            
+            yPos += 10;
+            doc.setTextColor(...darkGray);
+            doc.setFont('helvetica', 'normal');
+            
+            let rowIndex = 0;
+            bookings
+                .sort((a, b) => {
+                    const dateA = a.data().dateTime?.toDate() || new Date(0);
+                    const dateB = b.data().dateTime?.toDate() || new Date(0);
+                    return dateB - dateA;
+                })
+                .forEach(docItem => {
+                    if (yPos > 270) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                    
+                    const booking = docItem.data();
+                    const date = booking.dateTime?.toDate();
+                    const dateStr = date ? date.toLocaleDateString('it-IT') : 'N/A';
+                    const clientName = (booking.userName || booking.userEmail || 'N/A').substring(0, 25);
+                    const service = (serviceNames[booking.service] || booking.service || 'N/A').substring(0, 20);
+                    const price = booking.price || 0;
+                    const status = booking.status || 'pending';
+                    
+                    // Alternanza colori righe
+                    if (rowIndex % 2 === 0) {
+                        doc.setFillColor(249, 250, 251);
+                        doc.rect(10, yPos - 4, 190, 6, 'F');
+                    }
+                    
+                    doc.setFontSize(8);
+                    doc.setTextColor(...darkGray);
+                    doc.text(dateStr, 12, yPos);
+                    doc.text(clientName, 50, yPos);
+                    doc.text(service, 110, yPos);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(...secondaryColor);
+                    doc.text(`€${price.toFixed(2)}`, 190, yPos, { align: 'right' });
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(...darkGray);
+                    
+                    // Colore stato
+                    let statusColor = darkGray;
+                    if (status === 'completed') statusColor = [16, 185, 129]; // verde
+                    else if (status === 'confirmed') statusColor = [59, 130, 246]; // blu
+                    else if (status === 'pending') statusColor = [245, 158, 11]; // giallo
+                    else if (status === 'cancelled') statusColor = [239, 68, 68]; // rosso
+                    
+                    doc.setTextColor(...statusColor);
+                    doc.text(status, 185, yPos, { align: 'right' });
+                    
+                    yPos += 6;
+                    rowIndex++;
+                });
+        }
+        
+        // FOOTER su ogni pagina
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text(`Pagina ${i} di ${pageCount}`, 105, 285, { align: 'center' });
+            doc.text('PetCalendar - Sistema di Gestione Prenotazioni', 105, 290, { align: 'center' });
+        }
+        
+        // Salva PDF
+        const fileName = `report_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        
+    } catch (error) {
+        console.error('Errore nella generazione PDF:', error);
+        alert('Errore nella generazione del PDF: ' + error.message);
+    }
+}
+
+// Genera CSV del Report
+function generateCSVReport(bookings, totalRevenue, totalRevenueConfirmed, statusCounts, serviceStats, serviceNames, startDate, endDate) {
+    try {
+        const csvLines = [];
+        
+        // Header
+        csvLines.push('REPORT VENDITE E SERVIZI');
+        csvLines.push(`Periodo: ${startDate.toLocaleDateString('it-IT')} - ${endDate.toLocaleDateString('it-IT')}`);
+        csvLines.push(`Data generazione: ${new Date().toLocaleDateString('it-IT')}`);
+        csvLines.push('');
+        
+        // Fatturato
+        csvLines.push('FATTURATO');
+        csvLines.push(`Fatturato Completate,€${totalRevenue.toFixed(2)}`);
+        csvLines.push(`Fatturato Totale (Completate + Confermate),€${totalRevenueConfirmed.toFixed(2)}`);
+        csvLines.push(`Prenotazioni Totali,${bookings.length}`);
+        csvLines.push(`Completate,${statusCounts.completed}`);
+        csvLines.push(`Confermate,${statusCounts.confirmed}`);
+        csvLines.push(`In Attesa,${statusCounts.pending}`);
+        csvLines.push(`Annullate,${statusCounts.cancelled}`);
+        csvLines.push('');
+        
+        // Statistiche Servizi
+        if (Object.keys(serviceStats).length > 0) {
+            csvLines.push('STATISTICHE SERVIZI');
+            csvLines.push('Servizio,Quantità,Fatturato');
+            Object.entries(serviceStats)
+                .sort((a, b) => b[1].revenue - a[1].revenue)
+                .forEach(([service, stats]) => {
+                    csvLines.push(`${serviceNames[service] || service},${stats.count},€${stats.revenue.toFixed(2)}`);
+                });
+            csvLines.push('');
+        }
+        
+        // Dettaglio Vendite
+        csvLines.push('DETTAGLIO VENDITE');
+        csvLines.push('Data,Cliente,Email,Telefono,Animale,Tipo Animale,Servizio,Prezzo,Stato,Metodo Pagamento');
+        bookings
+            .sort((a, b) => {
+                const dateA = a.data().dateTime?.toDate() || new Date(0);
+                const dateB = b.data().dateTime?.toDate() || new Date(0);
+                return dateB - dateA;
+            })
+            .forEach(doc => {
+                const booking = doc.data();
+                const date = booking.dateTime?.toDate();
+                const dateStr = date ? date.toLocaleDateString('it-IT') + ' ' + date.toLocaleTimeString('it-IT') : 'N/A';
+                const clientName = booking.userName || booking.userEmail || 'N/A';
+                const email = booking.userEmail || '';
+                const phone = booking.userPhone || '';
+                const animalName = booking.animalName || 'N/A';
+                const animalType = booking.animalType || 'N/A';
+                const service = serviceNames[booking.service] || booking.service || 'N/A';
+                const price = booking.price || 0;
+                const status = booking.status || 'pending';
+                const payment = booking.paymentMethod || 'presenza';
+                
+                csvLines.push(`"${dateStr}","${clientName}","${email}","${phone}","${animalName}","${animalType}","${service}",€${price.toFixed(2)},"${status}","${payment}"`);
+            });
+        
+        // Crea e scarica CSV
+        const csvContent = csvLines.join('\n');
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        const fileName = `report_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}.csv`;
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+    } catch (error) {
+        console.error('Errore nella generazione CSV:', error);
+        alert('Errore nella generazione del CSV: ' + error.message);
     }
 }
 
@@ -1356,6 +1777,150 @@ async function deleteAccount() {
     } catch (error) {
         console.error('Errore nell\'eliminazione account:', error);
         alert('Errore nell\'eliminazione account: ' + error.message);
+    }
+}
+
+// Gestione Prenotazioni Admin
+function openAddBookingModal() {
+    const modal = document.getElementById('addBookingModal');
+    const dateTimeInput = document.getElementById('bookingDateTime');
+    
+    // Imposta data/ora di default (domani alle 10:00)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0);
+    dateTimeInput.value = tomorrow.toISOString().slice(0, 16);
+    
+    // Carica operatori nel select
+    loadOperatorsForBooking();
+    
+    modal.classList.add('show');
+}
+
+async function loadOperatorsForBooking() {
+    try {
+        const operatorSelect = document.getElementById('bookingOperator');
+        if (!operatorSelect) return;
+        
+        const operators = await db.collection('operators').get();
+        operatorSelect.innerHTML = '<option value="">Nessun operatore assegnato</option>';
+        
+        operators.forEach(doc => {
+            const operator = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = operator.name;
+            operatorSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Errore nel caricamento operatori:', error);
+    }
+}
+
+async function createAdminBooking() {
+    if (!currentUser) return;
+
+    const clientName = document.getElementById('bookingClientName').value;
+    const clientEmail = document.getElementById('bookingClientEmail').value;
+    const clientPhone = document.getElementById('bookingClientPhone').value;
+    const animalName = document.getElementById('bookingAnimalName').value;
+    const animalType = document.getElementById('bookingAnimalType').value;
+    const animalBreed = document.getElementById('bookingAnimalBreed').value;
+    const service = document.getElementById('bookingService').value;
+    const price = parseFloat(document.getElementById('bookingPrice').value);
+    const dateTime = document.getElementById('bookingDateTime').value;
+    const operatorId = document.getElementById('bookingOperator').value;
+    const notes = document.getElementById('bookingNotes').value;
+
+    if (!clientName || !animalName || !animalType || !service || !dateTime || isNaN(price) || price <= 0) {
+        alert('Compila tutti i campi obbligatori (Nome Cliente, Animale, Tipo, Servizio, Prezzo, Data/Ora)');
+        return;
+    }
+
+    try {
+        // Cerca o crea un cliente
+        let userId = null;
+        let userEmail = clientEmail || '';
+        
+        if (clientEmail) {
+            // Cerca cliente per email se fornita
+            const users = await db.collection('users').where('email', '==', clientEmail).limit(1).get();
+            
+            if (!users.empty) {
+                userId = users.docs[0].id;
+                // Aggiorna nome se diverso
+                const userData = users.docs[0].data();
+                if (userData.displayName !== clientName) {
+                    await db.collection('users').doc(userId).update({
+                        displayName: clientName,
+                        phone: clientPhone || userData.phone || '',
+                        updatedAt: getTimestamp()
+                    });
+                }
+            } else {
+                // Crea nuovo cliente
+                const newUserRef = db.collection('users').doc();
+                userId = newUserRef.id;
+                await newUserRef.set({
+                    email: clientEmail,
+                    displayName: clientName,
+                    phone: clientPhone || '',
+                    address: '',
+                    createdAt: getTimestamp(),
+                    updatedAt: getTimestamp()
+                });
+            }
+        } else {
+            // Se non c'è email, crea un cliente senza email
+            const newUserRef = db.collection('users').doc();
+            userId = newUserRef.id;
+            await newUserRef.set({
+                email: '',
+                displayName: clientName,
+                phone: clientPhone || '',
+                address: '',
+                createdAt: getTimestamp(),
+                updatedAt: getTimestamp()
+            });
+        }
+
+        // Determina lo status: se la data è passata, imposta come "confirmed"
+        const bookingDateTime = new Date(dateTime);
+        const now = new Date();
+        const bookingStatus = bookingDateTime <= now ? 'confirmed' : 'pending';
+
+        const bookingData = {
+            userId: userId,
+            userName: clientName,
+            userEmail: userEmail,
+            userPhone: clientPhone || '',
+            animalName: animalName,
+            animalType: animalType,
+            animalBreed: animalBreed || '',
+            service: service,
+            price: price,
+            dateTime: firebase.firestore.Timestamp.fromDate(bookingDateTime),
+            operatorId: operatorId || null,
+            paymentMethod: 'presenza', // Solo pagamento in presenza
+            notes: notes || '',
+            status: bookingStatus,
+            createdAt: getTimestamp(),
+            updatedAt: getTimestamp()
+        };
+
+        // Salva su Firebase
+        await db.collection('bookings').add(bookingData);
+
+        document.getElementById('addBookingForm').reset();
+        document.getElementById('addBookingModal').classList.remove('show');
+        
+        alert('Prenotazione creata con successo!');
+        
+        // Non ricaricare manualmente - i listener Firestore si aggiorneranno automaticamente
+        // Questo evita loop infiniti e "Maximum call stack size exceeded"
+    } catch (error) {
+        console.error('Errore nella creazione prenotazione:', error);
+        alert('Errore nella creazione della prenotazione: ' + error.message);
     }
 }
 
