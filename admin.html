@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PetCalendar - Area Toelettatore</title>
+    <title>PetCalendar - Dashboard Professionale</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.css">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.js"></script>
@@ -16,46 +16,176 @@
 <body>
     <nav class="navbar">
         <div class="container">
-            <h1 class="logo">🐾 PetCalendar - Admin</h1>
+            <h1 class="logo">🐾 PetCalendar - Dashboard</h1>
             <div class="nav-links">
                 <a href="index.html">Prenota</a>
-                <a href="admin.html" class="active">Area Toelettatore</a>
+                <a href="admin.html" class="active">Dashboard Professionale</a>
                 <button id="logoutBtn" class="btn btn-outline">Esci</button>
             </div>
         </div>
     </nav>
 
     <div class="container main-content">
+        <!-- Dashboard Header -->
         <div class="admin-header">
-            <h2>Agenda Giornaliera</h2>
-            <div class="date-selector">
-                <input type="date" id="selectedDate" value="">
-                <button id="todayBtn" class="btn btn-secondary">Oggi</button>
+            <h2>Dashboard Professionale</h2>
+            <div class="header-actions">
+                <div class="date-selector">
+                    <input type="date" id="selectedDate" value="">
+                    <button id="todayBtn" class="btn btn-secondary">Oggi</button>
+                </div>
+                <button id="exportDataBtn" class="btn btn-outline">📊 Esporta Dati</button>
             </div>
         </div>
 
-        <div class="calendar-container">
-            <div id="adminCalendar"></div>
+        <!-- Tab Navigation -->
+        <div class="admin-tabs">
+            <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
+            <button class="tab-btn" data-tab="calendar">📅 Calendario</button>
+            <button class="tab-btn" data-tab="bookings">📋 Prenotazioni</button>
+            <button class="tab-btn" data-tab="operators">👥 Operatori</button>
+            <button class="tab-btn" data-tab="reports">📈 Report</button>
         </div>
 
-        <div class="admin-stats">
-            <div class="stat-card">
-                <h3 id="todayBookings">0</h3>
-                <p>Prenotazioni Oggi</p>
+        <!-- Dashboard Tab -->
+        <div id="dashboardTab" class="tab-content active">
+            <div class="admin-stats">
+                <div class="stat-card">
+                    <h3 id="todayBookings">0</h3>
+                    <p>Prenotazioni Oggi</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="pendingBookings">0</h3>
+                    <p>In Attesa</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="completedBookings">0</h3>
+                    <p>Completate</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="monthlyRevenue">€0</h3>
+                    <p>Fatturato Mensile</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="totalClients">0</h3>
+                    <p>Clienti Totali</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="avgRating">-</h3>
+                    <p>Valutazione Media</p>
+                </div>
             </div>
-            <div class="stat-card">
-                <h3 id="pendingBookings">0</h3>
-                <p>In Attesa</p>
-            </div>
-            <div class="stat-card">
-                <h3 id="completedBookings">0</h3>
-                <p>Completate</p>
+
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <h3>Servizi Più Richiesti</h3>
+                    <div id="popularServices"></div>
+                </div>
+                <div class="dashboard-card">
+                    <h3>Clienti Più Frequenti</h3>
+                    <div id="topClients"></div>
+                </div>
+                <div class="dashboard-card">
+                    <h3>Prenotazioni Prossimi 7 Giorni</h3>
+                    <div id="upcomingBookings"></div>
+                </div>
             </div>
         </div>
 
-        <div class="bookings-list">
-            <h3>Prenotazioni del Giorno</h3>
-            <div id="adminBookingsList"></div>
+        <!-- Calendar Tab -->
+        <div id="calendarTab" class="tab-content">
+            <div class="calendar-filters">
+                <select id="filterOperator" class="filter-select">
+                    <option value="">Tutti gli operatori</option>
+                </select>
+                <select id="filterService" class="filter-select">
+                    <option value="">Tutti i servizi</option>
+                    <option value="toelettatura-completa">Toelettatura Completa</option>
+                    <option value="bagno">Bagno</option>
+                    <option value="taglio-unghie">Taglio Unghie</option>
+                    <option value="pulizia-orecchie">Pulizia Orecchie</option>
+                    <option value="taglio-pelo">Taglio Pelo</option>
+                </select>
+                <select id="filterStatus" class="filter-select">
+                    <option value="">Tutti gli stati</option>
+                    <option value="pending">In Attesa</option>
+                    <option value="confirmed">Confermate</option>
+                    <option value="completed">Completate</option>
+                    <option value="cancelled">Annullate</option>
+                </select>
+                <button id="clearFiltersBtn" class="btn btn-secondary">Pulisci Filtri</button>
+            </div>
+            <div class="calendar-container">
+                <div id="adminCalendar"></div>
+            </div>
+        </div>
+
+        <!-- Bookings Tab -->
+        <div id="bookingsTab" class="tab-content">
+            <div class="bookings-filters">
+                <input type="date" id="filterStartDate" class="filter-input" placeholder="Data inizio">
+                <input type="date" id="filterEndDate" class="filter-input" placeholder="Data fine">
+                <select id="filterBookingOperator" class="filter-select">
+                    <option value="">Tutti gli operatori</option>
+                </select>
+                <select id="filterBookingService" class="filter-select">
+                    <option value="">Tutti i servizi</option>
+                    <option value="toelettatura-completa">Toelettatura Completa</option>
+                    <option value="bagno">Bagno</option>
+                    <option value="taglio-unghie">Taglio Unghie</option>
+                    <option value="pulizia-orecchie">Pulizia Orecchie</option>
+                    <option value="taglio-pelo">Taglio Pelo</option>
+                </select>
+                <button id="applyFiltersBtn" class="btn btn-primary">Applica Filtri</button>
+            </div>
+            <div class="bookings-list">
+                <h3>Prenotazioni</h3>
+                <div id="adminBookingsList"></div>
+            </div>
+        </div>
+
+        <!-- Operators Tab -->
+        <div id="operatorsTab" class="tab-content">
+            <div class="operators-header">
+                <h3>Gestione Operatori</h3>
+                <button id="addOperatorBtn" class="btn btn-primary">+ Aggiungi Operatore</button>
+            </div>
+            <div id="operatorsList" class="operators-list"></div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="reportsTab" class="tab-content">
+            <div class="reports-header">
+                <h3>Reportistica Avanzata</h3>
+                <div class="report-period">
+                    <select id="reportPeriod" class="filter-select">
+                        <option value="week">Ultima Settimana</option>
+                        <option value="month" selected>Ultimo Mese</option>
+                        <option value="quarter">Ultimo Trimestre</option>
+                        <option value="year">Ultimo Anno</option>
+                        <option value="custom">Personalizzato</option>
+                    </select>
+                    <div id="customPeriod" style="display: none;">
+                        <input type="date" id="reportStartDate" class="filter-input">
+                        <input type="date" id="reportEndDate" class="filter-input">
+                    </div>
+                    <button id="generateReportBtn" class="btn btn-primary">Genera Report</button>
+                </div>
+            </div>
+            <div id="reportsContent" class="reports-content">
+                <div class="report-section">
+                    <h4>Fatturato</h4>
+                    <div id="revenueReport"></div>
+                </div>
+                <div class="report-section">
+                    <h4>Statistiche Servizi</h4>
+                    <div id="servicesReport"></div>
+                </div>
+                <div class="report-section">
+                    <h4>Performance Operatori</h4>
+                    <div id="operatorsReport"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Booking Detail Modal -->
@@ -69,6 +199,24 @@
                     <button id="completeBookingBtn" class="btn btn-primary">Completa</button>
                     <button id="cancelBookingBtn" class="btn btn-danger">Annulla</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Add Operator Modal -->
+        <div id="operatorModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Aggiungi Operatore</h2>
+                <form id="operatorForm">
+                    <input type="text" id="operatorName" placeholder="Nome operatore" required>
+                    <input type="email" id="operatorEmail" placeholder="Email" required>
+                    <input type="tel" id="operatorPhone" placeholder="Telefono">
+                    <select id="operatorRole">
+                        <option value="operator">Operatore</option>
+                        <option value="manager">Manager</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary">Salva Operatore</button>
+                </form>
             </div>
         </div>
     </div>
