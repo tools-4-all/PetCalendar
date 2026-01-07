@@ -14,8 +14,6 @@
         <div class="container">
             <h1 class="logo">PetCalendar</h1>
             <div class="nav-links">
-                <a href="index.html" class="active">Home</a>
-                <button id="loginBtn" class="btn btn-outline">Accedi</button>
                 <button id="logoutBtn" class="btn btn-outline" style="display: none;">Esci</button>
             </div>
         </div>
@@ -235,23 +233,15 @@
         });
 
         function updateUIForLoggedIn() {
-            const loginBtn = document.getElementById('loginBtn');
             const logoutBtn = document.getElementById('logoutBtn');
-            const dashboardLink = document.getElementById('dashboardLink');
             
-            if (loginBtn) loginBtn.style.display = 'none';
             if (logoutBtn) logoutBtn.style.display = 'block';
-            if (dashboardLink) dashboardLink.style.display = 'block';
         }
 
         function updateUIForLoggedOut() {
-            const loginBtn = document.getElementById('loginBtn');
             const logoutBtn = document.getElementById('logoutBtn');
-            const dashboardLink = document.getElementById('dashboardLink');
             
-            if (loginBtn) loginBtn.style.display = 'block';
             if (logoutBtn) logoutBtn.style.display = 'none';
-            if (dashboardLink) dashboardLink.style.display = 'none';
         }
 
         // Autenticazione
@@ -263,19 +253,14 @@
             }
 
             const loginModal = document.getElementById('loginModal');
-            const loginBtn = document.getElementById('loginBtn');
             const logoutBtn = document.getElementById('logoutBtn');
             const authForm = document.getElementById('authForm');
             const registerBtn = document.getElementById('registerBtn');
 
-            if (!loginModal || !loginBtn || !authForm || !registerBtn) {
+            if (!loginModal || !authForm || !registerBtn) {
                 console.error('Elementi DOM non trovati');
                 return;
             }
-
-            loginBtn.addEventListener('click', () => {
-                loginModal.classList.add('show');
-            });
 
             if (logoutBtn) {
                 logoutBtn.addEventListener('click', async () => {
