@@ -55,6 +55,22 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isOwner(resource.data.userId);
     }
     
+    // Collection: users
+    // Profili utente - solo il proprietario può leggere e modificare il proprio profilo
+    match /users/{userId} {
+      // Permetti lettura solo al proprietario
+      allow read: if isAuthenticated() && isOwner(userId);
+      
+      // Permetti creazione solo se l'utente crea il proprio profilo
+      allow create: if isAuthenticated() && isOwner(userId);
+      
+      // Permetti aggiornamento solo al proprietario
+      allow update: if isAuthenticated() && isOwner(userId);
+      
+      // Permetti eliminazione solo al proprietario
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
     // Blocca accesso a tutte le altre collection
     match /{document=**} {
       allow read, write: if false;

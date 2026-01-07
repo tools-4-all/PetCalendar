@@ -2,6 +2,9 @@
 let currentUser = null;
 let adminCalendar = null;
 let selectedDate = new Date();
+let adminCalendarUnsubscribe = null;
+let adminDayBookingsUnsubscribe = null;
+let adminStatsUnsubscribe = null;
 
 // Inizializzazione
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,6 +19,20 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = user;
             loadAdminData();
         } else {
+            currentUser = null;
+            // Disconnetti i listener quando l'utente esce
+            if (adminCalendarUnsubscribe) {
+                adminCalendarUnsubscribe();
+                adminCalendarUnsubscribe = null;
+            }
+            if (adminDayBookingsUnsubscribe) {
+                adminDayBookingsUnsubscribe();
+                adminDayBookingsUnsubscribe = null;
+            }
+            if (adminStatsUnsubscribe) {
+                adminStatsUnsubscribe();
+                adminStatsUnsubscribe = null;
+            }
             // Reindirizza al login se non autenticato
             window.location.href = 'index.html';
         }
@@ -129,45 +146,58 @@ async function loadAdminData() {
     loadStats();
 }
 
-// Carica eventi calendario
-async function loadCalendarEvents() {
+// Carica eventi calendario con sincronizzazione in tempo reale
+function loadCalendarEvents() {
+    // Disconnetti il listener precedente se esiste
+    if (adminCalendarUnsubscribe) {
+        adminCalendarUnsubscribe();
+    }
+
     try {
-        const snapshot = await db.collection('bookings')
+        // Sincronizzazione in tempo reale
+        adminCalendarUnsubscribe = db.collection('bookings')
             .where('status', 'in', ['pending', 'confirmed'])
             .orderBy('dateTime', 'asc')
-            .get();
+            .onSnapshot((snapshot) => {
+                const events = [];
+                snapshot.forEach(doc => {
+                    const booking = doc.data();
+                    const date = timestampToDate(booking.dateTime);
+                    
+                    let color = '#f39c12'; // pending
+                    if (booking.status === 'confirmed') {
+                        color = '#4a90e2';
+                    }
+                    
+                    events.push({
+                        id: doc.id,
+                        title: `${booking.animalName} - ${booking.service}`,
+                        start: date.toISOString(),
+                        backgroundColor: color,
+                        extendedProps: {
+                            booking: { id: doc.id, ...booking }
+                        }
+                    });
+                });
 
-        const events = [];
-        snapshot.forEach(doc => {
-            const booking = doc.data();
-            const date = timestampToDate(booking.dateTime);
-            
-            let color = '#f39c12'; // pending
-            if (booking.status === 'confirmed') {
-                color = '#4a90e2';
-            }
-            
-            events.push({
-                id: doc.id,
-                title: `${booking.animalName} - ${booking.service}`,
-                start: date.toISOString(),
-                backgroundColor: color,
-                extendedProps: {
-                    booking: { id: doc.id, ...booking }
-                }
+                adminCalendar.removeAllEvents();
+                adminCalendar.addEventSource(events);
+            }, (error) => {
+                console.error('Errore nel listener calendario admin:', error);
             });
-        });
-
-        adminCalendar.removeAllEvents();
-        adminCalendar.addEventSource(events);
     } catch (error) {
         console.error('Errore nel caricamento eventi:', error);
     }
 }
 
-// Carica prenotazioni del giorno
-async function loadDayBookings() {
+// Carica prenotazioni del giorno con sincronizzazione in tempo reale
+function loadDayBookings() {
     if (!selectedDate) return;
+
+    // Disconnetti il listener precedente se esiste
+    if (adminDayBookingsUnsubscribe) {
+        adminDayBookingsUnsubscribe();
+    }
 
     const startOfDay = new Date(selectedDate);
     startOfDay.setHours(0, 0, 0, 0);
@@ -176,25 +206,29 @@ async function loadDayBookings() {
     endOfDay.setHours(23, 59, 59, 999);
 
     try {
-        const snapshot = await db.collection('bookings')
+        const bookingsList = document.getElementById('adminBookingsList');
+        
+        // Sincronizzazione in tempo reale
+        adminDayBookingsUnsubscribe = db.collection('bookings')
             .where('dateTime', '>=', firebase.firestore.Timestamp.fromDate(startOfDay))
             .where('dateTime', '<=', firebase.firestore.Timestamp.fromDate(endOfDay))
             .orderBy('dateTime', 'asc')
-            .get();
+            .onSnapshot((snapshot) => {
+                bookingsList.innerHTML = '';
 
-        const bookingsList = document.getElementById('adminBookingsList');
-        bookingsList.innerHTML = '';
+                if (snapshot.empty) {
+                    bookingsList.innerHTML = '<p>Nessuna prenotazione per questo giorno</p>';
+                    return;
+                }
 
-        if (snapshot.empty) {
-            bookingsList.innerHTML = '<p>Nessuna prenotazione per questo giorno</p>';
-            return;
-        }
-
-        snapshot.forEach(doc => {
-            const booking = { id: doc.id, ...doc.data() };
-            const bookingCard = createAdminBookingCard(booking);
-            bookingsList.appendChild(bookingCard);
-        });
+                snapshot.forEach(doc => {
+                    const booking = { id: doc.id, ...doc.data() };
+                    const bookingCard = createAdminBookingCard(booking);
+                    bookingsList.appendChild(bookingCard);
+                });
+            }, (error) => {
+                console.error('Errore nel listener prenotazioni giornaliere:', error);
+            });
     } catch (error) {
         console.error('Errore nel caricamento prenotazioni:', error);
     }
@@ -351,35 +385,54 @@ async function updateBookingStatus(newStatus) {
     }
 }
 
-// Statistiche
-async function loadStats() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+// Statistiche con sincronizzazione in tempo reale
+function loadStats() {
+    // Disconnetti il listener precedente se esiste
+    if (adminStatsUnsubscribe) {
+        adminStatsUnsubscribe();
+    }
 
     try {
-        // Prenotazioni oggi
-        const todaySnapshot = await db.collection('bookings')
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        // Listener per prenotazioni di oggi
+        const todayUnsubscribe = db.collection('bookings')
             .where('dateTime', '>=', firebase.firestore.Timestamp.fromDate(today))
             .where('dateTime', '<', firebase.firestore.Timestamp.fromDate(tomorrow))
-            .get();
+            .onSnapshot((snapshot) => {
+                document.getElementById('todayBookings').textContent = snapshot.size;
+            }, (error) => {
+                console.error('Errore nel listener statistiche oggi:', error);
+            });
 
-        document.getElementById('todayBookings').textContent = todaySnapshot.size;
-
-        // Prenotazioni in attesa
-        const pendingSnapshot = await db.collection('bookings')
+        // Listener per prenotazioni in attesa
+        const pendingUnsubscribe = db.collection('bookings')
             .where('status', '==', 'pending')
-            .get();
+            .onSnapshot((snapshot) => {
+                document.getElementById('pendingBookings').textContent = snapshot.size;
+            }, (error) => {
+                console.error('Errore nel listener statistiche pending:', error);
+            });
 
-        document.getElementById('pendingBookings').textContent = pendingSnapshot.size;
-
-        // Prenotazioni completate
-        const completedSnapshot = await db.collection('bookings')
+        // Listener per prenotazioni completate
+        const completedUnsubscribe = db.collection('bookings')
             .where('status', '==', 'completed')
-            .get();
+            .onSnapshot((snapshot) => {
+                document.getElementById('completedBookings').textContent = snapshot.size;
+            }, (error) => {
+                console.error('Errore nel listener statistiche completed:', error);
+            });
 
-        document.getElementById('completedBookings').textContent = completedSnapshot.size;
+        // Funzione per disconnettere tutti i listener delle statistiche
+        adminStatsUnsubscribe = () => {
+            todayUnsubscribe();
+            pendingUnsubscribe();
+            completedUnsubscribe();
+        };
     } catch (error) {
         console.error('Errore nel caricamento statistiche:', error);
     }

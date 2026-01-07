@@ -2,6 +2,10 @@
 let currentUser = null;
 let calendar = null;
 let userAnimals = [];
+let userProfile = null;
+let animalsUnsubscribe = null;
+let bookingsUnsubscribe = null;
+let calendarUnsubscribe = null;
 
 // Inizializzazione
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,16 +15,45 @@ document.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
     
     // Verifica se l'utente è già autenticato
-    auth.onAuthStateChanged((user) => {
+    auth.onAuthStateChanged(async (user) => {
         if (user) {
-            currentUser = user;
-            document.getElementById('loginBtn').style.display = 'none';
-            document.getElementById('logoutBtn').style.display = 'block';
-            loadUserData();
+            // Controlla se l'email è verificata
+            // Ricarica l'utente per ottenere lo stato aggiornato della verifica email
+            await user.reload();
+            
+            if (!user.emailVerified) {
+                // Se l'email non è verificata, disconnetti l'utente
+                alert('Per favore, verifica la tua email prima di accedere. Controlla la tua casella di posta e clicca sul link di verifica.');
+                await auth.signOut();
+                currentUser = null;
+                document.getElementById('loginBtn').style.display = 'block';
+                document.getElementById('logoutBtn').style.display = 'none';
+            } else {
+                // Email verificata, permettere l'accesso
+                currentUser = user;
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('logoutBtn').style.display = 'block';
+                await loadUserProfile();
+                loadUserData();
+            }
         } else {
             currentUser = null;
+            userProfile = null;
             document.getElementById('loginBtn').style.display = 'block';
             document.getElementById('logoutBtn').style.display = 'none';
+            // Disconnetti i listener quando l'utente esce
+            if (animalsUnsubscribe) {
+                animalsUnsubscribe();
+                animalsUnsubscribe = null;
+            }
+            if (bookingsUnsubscribe) {
+                bookingsUnsubscribe();
+                bookingsUnsubscribe = null;
+            }
+            if (calendarUnsubscribe) {
+                calendarUnsubscribe();
+                calendarUnsubscribe = null;
+            }
         }
     });
 });
@@ -52,10 +85,38 @@ function initAuth() {
         const password = document.getElementById('password').value;
 
         try {
-            await auth.signInWithEmailAndPassword(email, password);
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            const user = userCredential.user;
+            
+            // Ricarica l'utente per ottenere lo stato aggiornato della verifica email
+            await user.reload();
+            
+            // Verifica se l'email è stata verificata
+            if (user && !user.emailVerified) {
+                // Disconnetti l'utente se l'email non è verificata
+                await auth.signOut();
+                
+                const resend = confirm('La tua email non è stata ancora verificata. Devi verificare l\'email prima di accedere. Vuoi ricevere nuovamente l\'email di verifica?');
+                if (resend) {
+                    try {
+                        await user.sendEmailVerification();
+                        alert('Email di verifica inviata! Controlla la tua casella di posta e clicca sul link di verifica prima di accedere nuovamente.');
+                    } catch (verificationError) {
+                        console.error('Errore nell\'invio email di verifica:', verificationError);
+                        alert('Errore nell\'invio dell\'email di verifica: ' + verificationError.message);
+                    }
+                } else {
+                    alert('Per favore, verifica la tua email prima di accedere. Controlla la tua casella di posta.');
+                }
+                loginModal.classList.remove('show');
+                authForm.reset();
+                return;
+            }
+            
             loginModal.classList.remove('show');
             authForm.reset();
         } catch (error) {
+            console.error('Errore durante il login:', error);
             alert('Errore durante il login: ' + error.message);
         }
     });
@@ -70,10 +131,29 @@ function initAuth() {
         }
 
         try {
-            await auth.createUserWithEmailAndPassword(email, password);
+            // Crea l'utente
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            const user = userCredential.user;
+            
+            // Invia email di verifica
+            try {
+                await user.sendEmailVerification();
+                alert('Registrazione completata! Controlla la tua email per verificare l\'account. Dovrai effettuare il login dopo aver verificato l\'email.');
+            } catch (verificationError) {
+                console.warn('Errore nell\'invio email di verifica:', verificationError);
+                alert('Registrazione completata, ma non è stato possibile inviare l\'email di verifica. Puoi richiederla più tardi dalle impostazioni.');
+            }
+            
+            // Disconnetti l'utente se l'email non è verificata
+            if (!user.emailVerified) {
+                await auth.signOut();
+                alert('Per favore, verifica la tua email prima di accedere. Controlla la tua casella di posta.');
+            }
+            
             loginModal.classList.remove('show');
             document.getElementById('authForm').reset();
         } catch (error) {
+            console.error('Errore durante la registrazione:', error);
             alert('Errore durante la registrazione: ' + error.message);
         }
     });
@@ -162,36 +242,89 @@ function initEventListeners() {
     });
 }
 
-// Gestione Animali
-async function loadAnimals() {
+// Gestione Profilo Utente
+async function loadUserProfile() {
     if (!currentUser) return;
 
     try {
-        const snapshot = await db.collection('animals')
-            .where('userId', '==', currentUser.uid)
-            .get();
+        const userDoc = await db.collection('users').doc(currentUser.uid).get();
+        
+        if (userDoc.exists) {
+            userProfile = { id: userDoc.id, ...userDoc.data() };
+        } else {
+            // Crea il profilo se non esiste
+            const newProfile = {
+                email: currentUser.email,
+                displayName: currentUser.displayName || '',
+                phone: '',
+                address: '',
+                createdAt: getTimestamp(),
+                updatedAt: getTimestamp()
+            };
+            await db.collection('users').doc(currentUser.uid).set(newProfile);
+            userProfile = { id: currentUser.uid, ...newProfile };
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento profilo:', error);
+    }
+}
 
-        userAnimals = [];
+async function updateUserProfile(profileData) {
+    if (!currentUser) return;
+
+    try {
+        const updateData = {
+            ...profileData,
+            updatedAt: getTimestamp()
+        };
+        await db.collection('users').doc(currentUser.uid).update(updateData);
+        userProfile = { ...userProfile, ...updateData };
+        return true;
+    } catch (error) {
+        console.error('Errore nell\'aggiornamento profilo:', error);
+        return false;
+    }
+}
+
+// Gestione Animali con sincronizzazione in tempo reale
+function loadAnimals() {
+    if (!currentUser) return;
+
+    // Disconnetti il listener precedente se esiste
+    if (animalsUnsubscribe) {
+        animalsUnsubscribe();
+    }
+
+    try {
         const animalsList = document.getElementById('animalsList');
-        animalsList.innerHTML = '';
+        
+        // Sincronizzazione in tempo reale
+        animalsUnsubscribe = db.collection('animals')
+            .where('userId', '==', currentUser.uid)
+            .onSnapshot((snapshot) => {
+                userAnimals = [];
+                animalsList.innerHTML = '';
 
-        snapshot.forEach(doc => {
-            const animal = { id: doc.id, ...doc.data() };
-            userAnimals.push(animal);
-            
-            const animalCard = document.createElement('div');
-            animalCard.className = 'animal-card';
-            animalCard.innerHTML = `
-                <div>
-                    <h4>${animal.name}</h4>
-                    <p>${animal.type} - ${animal.breed || 'N/A'}</p>
-                </div>
-                <button class="btn btn-danger" onclick="deleteAnimal('${animal.id}')">Elimina</button>
-            `;
-            animalsList.appendChild(animalCard);
-        });
+                snapshot.forEach(doc => {
+                    const animal = { id: doc.id, ...doc.data() };
+                    userAnimals.push(animal);
+                    
+                    const animalCard = document.createElement('div');
+                    animalCard.className = 'animal-card';
+                    animalCard.innerHTML = `
+                        <div>
+                            <h4>${animal.name}</h4>
+                            <p>${animal.type} - ${animal.breed || 'N/A'}</p>
+                        </div>
+                        <button class="btn btn-danger" onclick="deleteAnimal('${animal.id}')">Elimina</button>
+                    `;
+                    animalsList.appendChild(animalCard);
+                });
 
-        updateBookingAnimalSelect();
+                updateBookingAnimalSelect();
+            }, (error) => {
+                console.error('Errore nel listener animali:', error);
+            });
     } catch (error) {
         console.error('Errore nel caricamento animali:', error);
     }
@@ -328,28 +461,38 @@ async function createBooking() {
     }
 }
 
-async function loadBookings() {
+// Carica prenotazioni con sincronizzazione in tempo reale
+function loadBookings() {
     if (!currentUser) return;
 
+    // Disconnetti il listener precedente se esiste
+    if (bookingsUnsubscribe) {
+        bookingsUnsubscribe();
+    }
+
     try {
-        const snapshot = await db.collection('bookings')
+        const bookingsList = document.getElementById('bookingsList');
+        
+        // Sincronizzazione in tempo reale
+        bookingsUnsubscribe = db.collection('bookings')
             .where('userId', '==', currentUser.uid)
             .orderBy('dateTime', 'desc')
-            .get();
+            .onSnapshot((snapshot) => {
+                bookingsList.innerHTML = '';
 
-        const bookingsList = document.getElementById('bookingsList');
-        bookingsList.innerHTML = '';
+                if (snapshot.empty) {
+                    bookingsList.innerHTML = '<p>Nessuna prenotazione trovata</p>';
+                    return;
+                }
 
-        if (snapshot.empty) {
-            bookingsList.innerHTML = '<p>Nessuna prenotazione trovata</p>';
-            return;
-        }
-
-        snapshot.forEach(doc => {
-            const booking = { id: doc.id, ...doc.data() };
-            const bookingCard = createBookingCard(booking);
-            bookingsList.appendChild(bookingCard);
-        });
+                snapshot.forEach(doc => {
+                    const booking = { id: doc.id, ...doc.data() };
+                    const bookingCard = createBookingCard(booking);
+                    bookingsList.appendChild(bookingCard);
+                });
+            }, (error) => {
+                console.error('Errore nel listener prenotazioni:', error);
+            });
     } catch (error) {
         console.error('Errore nel caricamento prenotazioni:', error);
     }
@@ -381,32 +524,41 @@ function createBookingCard(booking) {
     return card;
 }
 
-async function loadCalendarEvents() {
+// Carica eventi calendario con sincronizzazione in tempo reale
+function loadCalendarEvents() {
     if (!currentUser || !calendar) return;
 
+    // Disconnetti il listener precedente se esiste
+    if (calendarUnsubscribe) {
+        calendarUnsubscribe();
+    }
+
     try {
-        const snapshot = await db.collection('bookings')
+        // Sincronizzazione in tempo reale
+        calendarUnsubscribe = db.collection('bookings')
             .where('userId', '==', currentUser.uid)
             .where('status', 'in', ['pending', 'confirmed'])
-            .get();
+            .onSnapshot((snapshot) => {
+                const events = [];
+                snapshot.forEach(doc => {
+                    const booking = doc.data();
+                    const date = timestampToDate(booking.dateTime);
+                    
+                    events.push({
+                        id: doc.id,
+                        title: `${booking.animalName} - ${booking.service}`,
+                        start: date.toISOString(),
+                        backgroundColor: booking.status === 'confirmed' ? '#50c878' : '#f39c12'
+                    });
+                });
 
-        const events = [];
-        snapshot.forEach(doc => {
-            const booking = doc.data();
-            const date = timestampToDate(booking.dateTime);
-            
-            events.push({
-                id: doc.id,
-                title: `${booking.animalName} - ${booking.service}`,
-                start: date.toISOString(),
-                backgroundColor: booking.status === 'confirmed' ? '#50c878' : '#f39c12'
+                if (calendar && typeof calendar.removeAllEvents === 'function') {
+                    calendar.removeAllEvents();
+                    calendar.addEventSource(events);
+                }
+            }, (error) => {
+                console.error('Errore nel listener calendario:', error);
             });
-        });
-
-        if (calendar && typeof calendar.removeAllEvents === 'function') {
-            calendar.removeAllEvents();
-            calendar.addEventSource(events);
-        }
     } catch (error) {
         console.error('Errore nel caricamento eventi calendario:', error);
     }
