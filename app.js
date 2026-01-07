@@ -294,21 +294,36 @@ async function createBooking() {
     try {
         const docRef = await db.collection('bookings').add(bookingData);
         
-        // Invia notifica
-        await sendBookingNotification(bookingData, docRef.id);
+        // Invia notifica (non bloccare se fallisce)
+        try {
+            await sendBookingNotification(bookingData, docRef.id);
+        } catch (notifError) {
+            console.warn('Errore nell\'invio notifica:', notifError);
+        }
         
-        // Se pagamento online, gestisci pagamento
+        // Se pagamento online, gestisci pagamento (non bloccare se fallisce)
         if (paymentMethod === 'online') {
-            await handleOnlinePayment(docRef.id, bookingData);
+            try {
+                await handleOnlinePayment(docRef.id, bookingData);
+            } catch (paymentError) {
+                console.warn('Errore nella gestione pagamento:', paymentError);
+            }
         }
 
         document.getElementById('bookingForm').reset();
         document.getElementById('bookingModal').classList.remove('show');
         
         alert('Prenotazione creata con successo!');
-        loadBookings();
-        loadCalendarEvents();
+        
+        // Ricarica i dati (non bloccare se fallisce)
+        try {
+            loadBookings();
+            loadCalendarEvents();
+        } catch (loadError) {
+            console.warn('Errore nel ricaricamento dati:', loadError);
+        }
     } catch (error) {
+        console.error('Errore nella creazione della prenotazione:', error);
         alert('Errore nella creazione della prenotazione: ' + error.message);
     }
 }
@@ -367,7 +382,7 @@ function createBookingCard(booking) {
 }
 
 async function loadCalendarEvents() {
-    if (!currentUser) return;
+    if (!currentUser || !calendar) return;
 
     try {
         const snapshot = await db.collection('bookings')
@@ -388,8 +403,10 @@ async function loadCalendarEvents() {
             });
         });
 
-        calendar.removeAllEvents();
-        calendar.addEventSource(events);
+        if (calendar && typeof calendar.removeAllEvents === 'function') {
+            calendar.removeAllEvents();
+            calendar.addEventSource(events);
+        }
     } catch (error) {
         console.error('Errore nel caricamento eventi calendario:', error);
     }

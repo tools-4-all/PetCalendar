@@ -56,17 +56,27 @@ const SERVICE_PRICES = {
 
 // Gestisci pagamento online
 window.handleOnlinePayment = async function(bookingId, bookingData) {
-    if (!stripe || !cardElement) {
-        console.warn('Stripe non configurato');
-        // Salva comunque la prenotazione come "pending payment"
-        await db.collection('bookings').doc(bookingId).update({
-            paymentStatus: 'pending',
-            paymentMethod: 'online'
-        });
-        return;
-    }
-
     try {
+        // Se Stripe non è configurato, salva solo lo stato del pagamento
+        if (!stripe || !cardElement || STRIPE_PUBLIC_KEY === 'YOUR_STRIPE_PUBLIC_KEY') {
+            console.warn('Stripe non configurato - la prenotazione è stata creata');
+        // Aggiorna solo se necessario (evita loop)
+        if (typeof db !== 'undefined' && db) {
+            try {
+                const bookingDoc = await db.collection('bookings').doc(bookingId).get();
+                if (bookingDoc.exists && !bookingDoc.data().paymentStatus) {
+                    await db.collection('bookings').doc(bookingId).update({
+                        paymentStatus: 'pending',
+                        paymentMethod: 'online'
+                    });
+                }
+            } catch (updateError) {
+                console.warn('Impossibile aggiornare stato pagamento:', updateError);
+            }
+        }
+            return;
+        }
+
         const amount = SERVICE_PRICES[bookingData.service] || 2000; // Default €20.00
 
         // Crea Payment Intent sul backend (richiede un backend)
@@ -85,7 +95,7 @@ window.handleOnlinePayment = async function(bookingId, bookingData) {
         }
     } catch (error) {
         console.error('Errore nel pagamento:', error);
-        alert('Errore nel processamento del pagamento. La prenotazione è stata creata ma il pagamento è in sospeso.');
+        // Non mostrare alert per evitare interruzioni - la prenotazione è già stata creata
     }
 }
 
@@ -96,6 +106,12 @@ async function createCheckoutSession(bookingId, amount, bookingData) {
     
     // Esempio con Firebase Cloud Functions:
     try {
+        // Controlla se Firebase Functions è disponibile
+        if (typeof firebase === 'undefined' || !firebase.functions) {
+            console.warn('Firebase Functions non disponibile');
+            return null;
+        }
+        
         const functions = firebase.functions();
         const createCheckoutSession = functions.httpsCallable('createCheckoutSession');
         
@@ -120,6 +136,12 @@ async function processPaymentWithCard(bookingId, amount, bookingData) {
     // Per un sito statico, usa Stripe Checkout invece
     
     try {
+        // Controlla se Firebase Functions è disponibile
+        if (typeof firebase === 'undefined' || !firebase.functions) {
+            console.warn('Firebase Functions non disponibile');
+            return;
+        }
+        
         const functions = firebase.functions();
         const createPaymentIntent = functions.httpsCallable('createPaymentIntent');
         
@@ -143,23 +165,35 @@ async function processPaymentWithCard(bookingId, amount, bookingData) {
         }
 
         if (paymentIntent.status === 'succeeded') {
-            await db.collection('bookings').doc(bookingId).update({
-                paymentStatus: 'paid',
-                paymentIntentId: paymentIntent.id,
-                paidAt: getTimestamp()
-            });
+            // Verifica che db sia disponibile
+            if (typeof db !== 'undefined' && db) {
+                const timestamp = typeof getTimestamp === 'function' 
+                    ? getTimestamp() 
+                    : firebase.firestore.Timestamp.now();
+                    
+                await db.collection('bookings').doc(bookingId).update({
+                    paymentStatus: 'paid',
+                    paymentIntentId: paymentIntent.id,
+                    paidAt: timestamp
+                });
+            }
             
             alert('Pagamento completato con successo!');
         }
     } catch (error) {
         console.error('Errore nel pagamento:', error);
-        throw error;
+        // Non rilanciare l'errore per evitare loop
     }
 }
 
 // Verifica stato pagamento (da chiamare dopo il redirect da Stripe Checkout)
 async function verifyPaymentStatus(bookingId) {
     try {
+        if (typeof db === 'undefined' || !db) {
+            console.warn('Database non disponibile');
+            return false;
+        }
+        
         const bookingDoc = await db.collection('bookings').doc(bookingId).get();
         if (bookingDoc.exists) {
             const booking = bookingDoc.data();

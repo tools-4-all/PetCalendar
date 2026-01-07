@@ -1,22 +1,63 @@
-# OS
-.DS_Store
-Thumbs.db
+# File di configurazione sensibili
+firebase-config.js
+*.env
+.env.local
+.env.*.local
 
-# IDE
+# File di documentazione sensibili (se contengono informazioni private)
+*.md
+!README.md
+
+# File di sistema macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# File di sistema Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# File di sistema Linux
+*~
+.directory
+.Trash-*
+
+# File di editor/IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
 
-# Logs
+# File di log
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Environment
-.env
-.env.local
-
-# Build (se necessario in futuro)
+# File di cache e build
+.cache/
 dist/
 build/
+*.tmp
+*.temp
+
+# File di dipendenze (se aggiunte in futuro)
+node_modules/
+package-lock.json
+yarn.lock
+
+# File di backup
+*.bak
+*.backup
+*~
+
+# File di configurazione locale
+config.local.js
+settings.local.js

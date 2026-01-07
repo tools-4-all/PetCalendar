@@ -1,12 +1,12 @@
 // Configurazione Firebase
-// IMPORTANTE: Sostituisci questi valori con quelli del tuo progetto Firebase
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyBHF2Aed5gE_QUvqQy-psWuotLoYmL5gI4",
+    authDomain: "petcalendar-67853.firebaseapp.com",
+    projectId: "petcalendar-67853",
+    storageBucket: "petcalendar-67853.firebasestorage.app",
+    messagingSenderId: "453358757122",
+    appId: "1:453358757122:web:181ac31c2bad4069c40e1b",
+    measurementId: "G-SNVSZ65LBH"
 };
 
 // Inizializza Firebase

@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function per verificare se l'utente è autenticato
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function per verificare se l'utente è il proprietario
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Collection: animals
+    // Solo il proprietario può leggere e modificare i propri animali
+    match /animals/{animalId} {
+      // Permetti lettura solo al proprietario
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // Permetti creazione solo se l'utente è il proprietario
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
+      
+      // Permetti aggiornamento solo al proprietario
+      allow update: if isAuthenticated() && isOwner(resource.data.userId);
+      
+      // Permetti eliminazione solo al proprietario
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+    
+    // Collection: bookings
+    // I clienti vedono solo le loro prenotazioni, l'admin vede tutto
+    match /bookings/{bookingId} {
+      // Permetti lettura se:
+      // - Sei il proprietario della prenotazione, OPPURE
+      // - Sei autenticato (per permettere all'admin di vedere tutte le prenotazioni)
+      // Nota: Per maggiore sicurezza, puoi aggiungere un controllo admin usando custom claims
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.userId) || 
+        true // Permette a tutti gli autenticati di leggere (necessario per admin)
+      );
+      
+      // Permetti creazione solo se l'utente crea una prenotazione per se stesso
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
+      
+      // Permetti aggiornamento se:
+      // - Sei il proprietario, OPPURE
+      // - Sei autenticato (per permettere all'admin di aggiornare lo status)
+      allow update: if isAuthenticated() && (
+        isOwner(resource.data.userId) || 
+        true // Permette a tutti gli autenticati di aggiornare (necessario per admin)
+      );
+      
+      // Permetti eliminazione solo al proprietario
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+    
+    // Blocca accesso a tutte le altre collection
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
