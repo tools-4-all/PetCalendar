@@ -183,6 +183,20 @@ function initTabs() {
             tabBtns.forEach(b => b.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
             
+            // Se si apre la tab settings, assicurati che il link sia generato
+            if (targetTab === 'settings' && currentUser) {
+                console.log('Tab Settings aperta, verifico link...');
+                setTimeout(() => {
+                    const linkInput = document.getElementById('bookingLink');
+                    if (linkInput && (!linkInput.value || linkInput.value.trim() === '')) {
+                        console.log('Link vuoto, rigenero...');
+                        loadBookingLink();
+                    } else if (linkInput) {
+                        console.log('Link già presente:', linkInput.value);
+                    }
+                }, 100);
+            }
+            
             // Aggiungi active al selezionato
             btn.classList.add('active');
             const targetTabContent = document.getElementById(targetTab + 'Tab');
@@ -439,6 +453,38 @@ function initEventListeners() {
         alert('Funzionalità di gestione fatturazione in arrivo. Per ora, contatta il supporto per modifiche al piano.');
     });
 
+    // Booking Link
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
+    const testLinkBtn = document.getElementById('testLinkBtn');
+    const shareLinkBtn = document.getElementById('shareLinkBtn');
+    
+    if (copyLinkBtn) {
+        copyLinkBtn.addEventListener('click', () => {
+            console.log('Cliccato Copia Link');
+            copyBookingLink();
+        });
+    } else {
+        console.warn('Pulsante copyLinkBtn non trovato');
+    }
+    
+    if (testLinkBtn) {
+        testLinkBtn.addEventListener('click', () => {
+            console.log('Cliccato Testa Link');
+            testBookingLink();
+        });
+    } else {
+        console.warn('Pulsante testLinkBtn non trovato');
+    }
+    
+    if (shareLinkBtn) {
+        shareLinkBtn.addEventListener('click', () => {
+            console.log('Cliccato Condividi');
+            shareBookingLink();
+        });
+    } else {
+        console.warn('Pulsante shareLinkBtn non trovato');
+    }
+
     document.querySelectorAll('.plan-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const plan = e.target.dataset.plan;
@@ -475,6 +521,13 @@ function loadCalendarEvents() {
     if (!adminCalendar) return;
 
     try {
+        if (!currentUser) {
+            console.log('loadCalendarEvents: utente non autenticato');
+            return;
+        }
+        
+        // Query base - per retrocompatibilità, filtriamo lato client
+        // (le prenotazioni vecchie potrebbero non avere companyId)
         let query = db.collection('bookings');
         
         // Applica filtri
@@ -495,6 +548,12 @@ function loadCalendarEvents() {
                 const events = [];
                 snapshot.forEach(doc => {
                     const booking = doc.data();
+                    
+                    // Filtra per companyId lato client (per retrocompatibilità)
+                    if (booking.companyId && booking.companyId !== currentUser.uid) {
+                        return; // Salta prenotazioni di altre aziende
+                    }
+                    // Se non ha companyId, includiamo la prenotazione (retrocompatibilità)
                     
                     // Filtro operatore (se implementato)
                     if (currentFilters.operator && booking.operatorId !== currentFilters.operator) {
@@ -523,6 +582,41 @@ function loadCalendarEvents() {
                 adminCalendar.addEventSource(events);
             }, (error) => {
                 console.error('Errore nel listener calendario admin:', error);
+                // Se la query fallisce per mancanza di indice, prova una query alternativa
+                if (error.code === 'failed-precondition') {
+                    console.warn('Query fallita per mancanza di indice. Creando query alternativa...');
+                    // Prova una query più semplice senza alcuni filtri
+                    try {
+                        const fallbackQuery = db.collection('bookings')
+                            .where('companyId', '==', currentUser.uid)
+                            .orderBy('dateTime', 'asc');
+                        
+                        adminCalendarUnsubscribe = fallbackQuery.onSnapshot((snapshot) => {
+                            const events = [];
+                            snapshot.forEach(doc => {
+                                const booking = doc.data();
+                                // Filtra lato client
+                                if (booking.companyId && booking.companyId !== currentUser.uid) return;
+                                if (currentFilters.status && booking.status !== currentFilters.status) return;
+                                if (!currentFilters.status && !['pending', 'confirmed'].includes(booking.status)) return;
+                                if (currentFilters.service && booking.service !== currentFilters.service) return;
+                                
+                                const date = timestampToDate(booking.dateTime);
+                                events.push({
+                                    id: doc.id,
+                                    title: `${booking.animalName} - ${booking.service}`,
+                                    start: date.toISOString(),
+                                    backgroundColor: booking.status === 'confirmed' ? '#4a90e2' : '#f39c12',
+                                    extendedProps: { booking: { id: doc.id, ...booking } }
+                                });
+                            });
+                            adminCalendar.removeAllEvents();
+                            adminCalendar.addEventSource(events);
+                        });
+                    } catch (fallbackError) {
+                        console.error('Anche la query alternativa è fallita:', fallbackError);
+                    }
+                }
             });
     } catch (error) {
         console.error('Errore nel caricamento eventi:', error);
@@ -545,9 +639,11 @@ function loadDayBookings() {
     endOfDay.setHours(23, 59, 59, 999);
 
     try {
+        if (!currentUser) return;
+        
         const bookingsList = document.getElementById('adminBookingsList');
         
-        // Sincronizzazione in tempo reale
+        // Sincronizzazione in tempo reale - filtriamo lato client per retrocompatibilità
         adminDayBookingsUnsubscribe = db.collection('bookings')
             .where('dateTime', '>=', firebase.firestore.Timestamp.fromDate(startOfDay))
             .where('dateTime', '<=', firebase.firestore.Timestamp.fromDate(endOfDay))
@@ -555,12 +651,18 @@ function loadDayBookings() {
             .onSnapshot((snapshot) => {
                 bookingsList.innerHTML = '';
 
-                if (snapshot.empty) {
+                // Filtra lato client per companyId
+                const filtered = snapshot.docs.filter(doc => {
+                    const data = doc.data();
+                    return !data.companyId || data.companyId === currentUser.uid;
+                });
+
+                if (filtered.length === 0) {
                     bookingsList.innerHTML = '<p>Nessuna prenotazione per questo giorno</p>';
                     return;
                 }
 
-                snapshot.forEach(doc => {
+                filtered.forEach(doc => {
                     const booking = { id: doc.id, ...doc.data() };
                     const bookingCard = createAdminBookingCard(booking);
                     bookingsList.appendChild(bookingCard);
@@ -749,12 +851,20 @@ function loadStats() {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
+        if (!currentUser) return;
+        
         // Listener per prenotazioni di oggi
+        // Nota: per retrocompatibilità, filtriamo lato client se companyId non esiste
         const todayUnsubscribe = db.collection('bookings')
             .where('dateTime', '>=', firebase.firestore.Timestamp.fromDate(today))
             .where('dateTime', '<', firebase.firestore.Timestamp.fromDate(tomorrow))
             .onSnapshot((snapshot) => {
-                document.getElementById('todayBookings').textContent = snapshot.size;
+                // Filtra lato client per companyId
+                const filtered = snapshot.docs.filter(doc => {
+                    const data = doc.data();
+                    return !data.companyId || data.companyId === currentUser.uid;
+                });
+                document.getElementById('todayBookings').textContent = filtered.length;
             }, (error) => {
                 console.error('Errore nel listener statistiche oggi:', error);
             });
@@ -763,7 +873,12 @@ function loadStats() {
         const pendingUnsubscribe = db.collection('bookings')
             .where('status', '==', 'pending')
             .onSnapshot((snapshot) => {
-                document.getElementById('pendingBookings').textContent = snapshot.size;
+                // Filtra lato client per companyId
+                const filtered = snapshot.docs.filter(doc => {
+                    const data = doc.data();
+                    return !data.companyId || data.companyId === currentUser.uid;
+                });
+                document.getElementById('pendingBookings').textContent = filtered.length;
             }, (error) => {
                 console.error('Errore nel listener statistiche pending:', error);
             });
@@ -772,7 +887,12 @@ function loadStats() {
         const completedUnsubscribe = db.collection('bookings')
             .where('status', '==', 'completed')
             .onSnapshot((snapshot) => {
-                document.getElementById('completedBookings').textContent = snapshot.size;
+                // Filtra lato client per companyId
+                const filtered = snapshot.docs.filter(doc => {
+                    const data = doc.data();
+                    return !data.companyId || data.companyId === currentUser.uid;
+                });
+                document.getElementById('completedBookings').textContent = filtered.length;
             }, (error) => {
                 console.error('Errore nel listener statistiche completed:', error);
             });
@@ -795,6 +915,9 @@ function loadAllBookings() {
     }
 
     try {
+        if (!currentUser) return;
+        
+        // Query base - filtriamo lato client per retrocompatibilità
         let query = db.collection('bookings');
         
         // Applica filtri data
@@ -829,6 +952,11 @@ function loadAllBookings() {
                 snapshot.forEach(doc => {
                     const booking = { id: doc.id, ...doc.data() };
                     
+                    // Filtra per companyId lato client
+                    if (booking.companyId && booking.companyId !== currentUser.uid) {
+                        return; // Salta prenotazioni di altre aziende
+                    }
+                    
                     // Filtro operatore
                     if (currentFilters.operator && booking.operatorId !== currentFilters.operator) {
                         return;
@@ -855,18 +983,25 @@ function loadAdvancedStats() {
     }
 
     try {
+        if (!currentUser) return;
+        
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         startOfMonth.setHours(0, 0, 0, 0);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
         
         // Usa listener in tempo reale invece di query una tantum
+        // Filtriamo lato client per retrocompatibilità
         advancedStatsUnsubscribe = db.collection('bookings')
             .orderBy('dateTime', 'desc')
             .onSnapshot((snapshot) => {
-                // Filtra per mese corrente
+                // Filtra per mese corrente e companyId
                 const monthlyBookings = snapshot.docs.filter(doc => {
                     const booking = doc.data();
+                    // Filtra per companyId
+                    if (booking.companyId && booking.companyId !== currentUser.uid) {
+                        return false;
+                    }
                     const bookingDate = booking.dateTime?.toDate();
                     if (!bookingDate) return false;
                     return bookingDate >= startOfMonth && bookingDate <= endOfMonth;
@@ -1251,10 +1386,16 @@ async function generateReport() {
     }
     
     try {
-        // Carica i dati per il PDF
+        if (!currentUser) return;
+        
+        // Carica i dati per il PDF - filtriamo lato client per retrocompatibilità
         const allBookingsSnapshot = await db.collection('bookings').get();
         const bookings = allBookingsSnapshot.docs.filter(doc => {
             const booking = doc.data();
+            // Filtra per companyId
+            if (booking.companyId && booking.companyId !== currentUser.uid) {
+                return false;
+            }
             const bookingDate = booking.dateTime?.toDate();
             if (!bookingDate) return false;
             return bookingDate >= startDate && bookingDate <= endDate;
@@ -1812,9 +1953,303 @@ async function loadSettings() {
             document.getElementById('notifySMS').checked = userData.notifySMS === true;
             document.getElementById('notifyReminders').checked = userData.notifyReminders !== false;
         }
+
+        // Genera e mostra il link di prenotazione
+        loadBookingLink();
     } catch (error) {
         console.error('Errore nel caricamento impostazioni:', error);
     }
+}
+
+// Carica e mostra il link di prenotazione
+function loadBookingLink() {
+    if (!currentUser) return;
+
+    // Controlla se stanno usando file:// invece di http://
+    const currentUrl = window.location.href;
+    const isFileProtocol = currentUrl.startsWith('file://');
+    
+    if (isFileProtocol) {
+        console.warn('⚠️ ATTENZIONE: Stai usando file:// invece di un server HTTP!');
+        const linkInput = document.getElementById('bookingLink');
+        const linkStatus = document.getElementById('linkStatus');
+        
+        if (linkInput) {
+            linkInput.value = 'ERRORE: Avvia un server HTTP (vedi istruzioni sotto)';
+            linkInput.style.color = '#dc2626';
+        }
+        
+        if (linkStatus) {
+            linkStatus.innerHTML = '⚠️ <strong>IMPORTANTE:</strong> Devi avviare un server HTTP!<br>' +
+                'Apri il terminale nella directory del progetto ed esegui:<br>' +
+                '<code style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">python3 -m http.server 8000</code><br>' +
+                'Poi apri: <code style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">http://localhost:8000/admin.html</code>';
+            linkStatus.style.color = '#dc2626';
+            linkStatus.style.whiteSpace = 'normal';
+        }
+        return;
+    }
+
+    // Genera il link in modo robusto che funziona sia in localhost che in produzione
+    // Usa window.location per ottenere l'URL corrente
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    
+    console.log('=== Generazione Link (Produzione/Localhost) ===');
+    console.log('Origin:', origin);
+    console.log('Pathname:', pathname);
+    console.log('URL completo:', currentUrl);
+    
+    let bookingLink;
+    
+    // Metodo principale: sostituisci admin.html con booking.html nel pathname
+    if (pathname.includes('admin.html')) {
+        // Sostituisci direttamente admin.html con booking.html
+        const bookingPath = pathname.replace(/admin\.html.*$/, 'booking.html');
+        bookingLink = `${origin}${bookingPath}?companyId=${currentUser.uid}`;
+        console.log('✓ Metodo: Sostituzione diretta nel pathname');
+    } else {
+        // Se non c'è admin.html nel path, aggiungi booking.html alla fine del path
+        // Rimuovi eventuali query string e hash
+        const cleanPath = pathname.split('?')[0].split('#')[0];
+        // Rimuovi il nome file finale se presente
+        const dirPath = cleanPath.substring(0, cleanPath.lastIndexOf('/') + 1);
+        bookingLink = `${origin}${dirPath}booking.html?companyId=${currentUser.uid}`;
+        console.log('✓ Metodo: Aggiunta booking.html al path');
+    }
+    
+    console.log('Link finale generato:', bookingLink);
+    
+    const linkInput = document.getElementById('bookingLink');
+    const linkStatus = document.getElementById('linkStatus');
+    
+    if (linkInput) {
+        linkInput.value = bookingLink;
+        linkInput.style.color = ''; // Reset colore
+        
+        // Verifica se siamo in produzione o localhost
+        const isProduction = !origin.includes('localhost') && !origin.includes('127.0.0.1');
+        const envText = isProduction ? 'Produzione' : 'Localhost';
+        
+        console.log(`✓ Link generato per ${envText}:`, bookingLink);
+        console.log('  Origin:', origin);
+        console.log('  Pathname:', pathname);
+        console.log('  Company ID:', currentUser.uid);
+        
+        if (linkStatus) {
+            linkStatus.textContent = `✓ Link generato correttamente (${envText})`;
+            linkStatus.style.color = '#10b981';
+            linkStatus.style.whiteSpace = 'normal';
+        }
+    } else {
+        console.error('✗ ERRORE: Campo bookingLink non trovato nel DOM!');
+        console.log('Tentativo di trovare elementi simili:', document.querySelectorAll('[id*="link"], [id*="booking"]'));
+        
+        if (linkStatus) {
+            linkStatus.textContent = '✗ Errore: campo link non trovato';
+            linkStatus.style.color = '#dc2626';
+        }
+    }
+}
+
+// Copia il link negli appunti
+function copyBookingLink() {
+    const linkInput = document.getElementById('bookingLink');
+    if (!linkInput) return;
+
+    linkInput.select();
+    linkInput.setSelectionRange(0, 99999); // Per dispositivi mobili
+
+    try {
+        document.execCommand('copy');
+        
+        // Mostra messaggio di successo
+        const successMsg = document.getElementById('linkCopiedMessage');
+        if (successMsg) {
+            successMsg.style.display = 'block';
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Feedback visivo
+        const copyBtn = document.getElementById('copyLinkBtn');
+        if (copyBtn) {
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '✓ Copiato!';
+            copyBtn.style.background = 'var(--success-color)';
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+                copyBtn.style.background = '';
+            }, 2000);
+        }
+    } catch (err) {
+        console.error('Errore nella copia:', err);
+        alert('Impossibile copiare il link. Copialo manualmente.');
+    }
+}
+
+// Testa il link aprendolo in una nuova scheda
+async function testBookingLink() {
+    console.log('=== testBookingLink chiamata ===');
+    
+    const linkInput = document.getElementById('bookingLink');
+    if (!linkInput) {
+        console.error('linkInput non trovato');
+        alert('Errore: Campo link non trovato. Ricarica la pagina e riprova.');
+        return;
+    }
+    
+    const link = linkInput.value;
+    console.log('Link da testare:', link);
+    
+    if (!link || link.trim() === '') {
+        console.error('Link vuoto');
+        alert('Errore: Il link è vuoto. Assicurati di essere loggato e che il link sia stato generato correttamente.');
+        return;
+    }
+    
+    // Verifica che il link contenga booking.html
+    if (!link.includes('booking.html')) {
+        console.error('Link non contiene booking.html:', link);
+        alert('Errore: Il link non sembra valido.\n\nLink attuale: ' + link + '\n\nControlla che booking.html esista nella stessa directory di admin.html');
+        return;
+    }
+    
+    console.log('Aprendo link in nuova scheda...');
+    
+    // Prova a verificare se il file esiste (solo se stesso dominio)
+    try {
+        const fileUrl = link.split('?')[0];
+        console.log('Verificando file:', fileUrl);
+        console.log('URL completo link:', link);
+        console.log('URL base file:', fileUrl);
+        
+        const response = await fetch(fileUrl, { method: 'HEAD' });
+        console.log('Risposta fetch:', response.status, response.ok);
+        console.log('URL finale richiesto:', response.url || fileUrl);
+        
+        if (!response.ok && response.status === 404) {
+            console.error('File non trovato! URL richiesto:', fileUrl);
+            console.error('Origin corrente:', window.location.origin);
+            console.error('Pathname corrente:', window.location.pathname);
+            
+            // Prova a costruire URL alternativi
+            const altUrl1 = window.location.origin + '/booking.html';
+            const altUrl2 = window.location.origin + window.location.pathname.replace('admin.html', 'booking.html');
+            console.log('URL alternativo 1:', altUrl1);
+            console.log('URL alternativo 2:', altUrl2);
+            
+            const errorMsg = '⚠️ File booking.html non trovato (404)!\n\n' +
+                  'URL richiesto: ' + fileUrl + '\n\n' +
+                  'Possibili soluzioni:\n' +
+                  '1. Verifica che booking.html sia nella stessa directory di admin.html\n' +
+                  '2. Se usi un server locale, avvialo dalla directory del progetto\n' +
+                  '3. Prova ad aprire manualmente: ' + altUrl1 + '\n\n' +
+                  'Aprendo comunque il link per verificare...';
+            
+            alert(errorMsg);
+        } else if (response.ok) {
+            console.log('✓ File trovato correttamente!');
+        }
+    } catch (error) {
+        console.warn('Impossibile verificare il file (potrebbe essere normale se cross-origin):', error);
+        console.warn('Dettagli errore:', error.message);
+        // Continua comunque ad aprire il link
+    }
+    
+    // Apri in una nuova scheda
+    try {
+        console.log('Tentativo di aprire:', link);
+        const newWindow = window.open(link, '_blank');
+        if (!newWindow) {
+            alert('Impossibile aprire la nuova finestra. Verifica che il popup blocker non sia attivo.\n\n' +
+                  'Alternativa: copia il link e aprilo manualmente nel browser:\n' + link);
+        } else {
+            console.log('Link aperto con successo in nuova finestra');
+            // Dopo 2 secondi, verifica se la pagina si è caricata
+            setTimeout(() => {
+                try {
+                    // Non possiamo verificare direttamente, ma possiamo suggerire
+                    console.log('Se vedi una pagina 404, il file booking.html potrebbe non essere nella posizione corretta.');
+                } catch (e) {
+                    // Ignora errori cross-origin
+                }
+            }, 2000);
+        }
+    } catch (error) {
+        console.error('Errore nell\'apertura del link:', error);
+        alert('Errore nell\'apertura del link: ' + error.message + '\n\n' +
+              'Prova a copiare il link e aprirlo manualmente:\n' + link);
+    }
+}
+
+// Condividi il link
+function shareBookingLink() {
+    const linkInput = document.getElementById('bookingLink');
+    if (!linkInput) return;
+
+    const link = linkInput.value;
+    const text = 'Prenota il tuo appuntamento online: ' + link;
+
+    // Prova a usare l'API Web Share se disponibile
+    if (navigator.share) {
+        navigator.share({
+            title: 'Prenota Appuntamento',
+            text: text,
+            url: link
+        }).catch(err => {
+            console.log('Errore nella condivisione:', err);
+            fallbackShare(link);
+        });
+    } else {
+        fallbackShare(link);
+    }
+}
+
+// Testa booking.html direttamente (senza parametri)
+function testDirectBooking() {
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    let bookingUrl;
+    
+    if (pathname.includes('admin.html')) {
+        bookingUrl = pathname.replace(/admin\.html.*$/, 'booking.html');
+    } else {
+        const dirPath = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+        bookingUrl = dirPath + 'booking.html';
+    }
+    
+    const fullUrl = origin + bookingUrl;
+    console.log('Test diretto booking.html:', fullUrl);
+    console.log('Origin:', origin);
+    console.log('Pathname:', pathname);
+    console.log('Booking URL:', bookingUrl);
+    
+    window.open(fullUrl, '_blank');
+}
+
+// Fallback per la condivisione
+function fallbackShare(link) {
+    // Copia il link
+    copyBookingLink();
+    
+    // Mostra opzioni di condivisione
+    const shareOptions = [
+        { name: 'Email', action: () => window.location.href = `mailto:?subject=Prenota Appuntamento&body=${encodeURIComponent('Prenota il tuo appuntamento online: ' + link)}` },
+        { name: 'WhatsApp', action: () => window.open(`https://wa.me/?text=${encodeURIComponent('Prenota il tuo appuntamento online: ' + link)}`, '_blank') },
+        { name: 'Messaggio SMS', action: () => window.location.href = `sms:?body=${encodeURIComponent('Prenota il tuo appuntamento online: ' + link)}` }
+    ];
+    
+    // Mostra un messaggio con il link copiato
+    alert('Link copiato negli appunti!\n\n' + 
+          'Link: ' + link + '\n\n' +
+          'Puoi incollarlo in:\n' +
+          '- Email\n' +
+          '- WhatsApp\n' +
+          '- Messaggi\n' +
+          '- Social media\n' +
+          '- Sito web');
 }
 
 async function saveCompanyProfile() {
@@ -1923,7 +2358,7 @@ async function deleteAccount() {
         const batch = db.batch();
         
         // Elimina prenotazioni
-        const bookings = await db.collection('bookings').where('userId', '==', currentUser.uid).get();
+        const bookings = await db.collection('bookings').where('companyId', '==', currentUser.uid).get();
         bookings.forEach(doc => batch.delete(doc.ref));
 
         // Elimina animali
@@ -2062,6 +2497,7 @@ async function createAdminBooking() {
         const bookingStatus = bookingDateTime <= now ? 'confirmed' : 'pending';
 
         const bookingData = {
+            companyId: currentUser.uid, // Associa prenotazione all'azienda
             userId: userId,
             userName: clientName,
             userEmail: userEmail,
@@ -2076,6 +2512,7 @@ async function createAdminBooking() {
             paymentMethod: 'presenza', // Solo pagamento in presenza
             notes: notes || '',
             status: bookingStatus,
+            source: 'admin', // Indica che proviene dalla dashboard admin
             createdAt: getTimestamp(),
             updatedAt: getTimestamp()
         };
@@ -2139,10 +2576,17 @@ async function loadAdvancedAnalytics() {
         // Load all bookings in the period
         // NOTA: I dati vengono caricati da Firestore (database cloud), non sono in locale
         // db.collection('bookings') accede al database Firebase Firestore
+        if (!currentUser) return;
+        
+        // Carica tutte le prenotazioni e filtra lato client per retrocompatibilità
         const allBookingsSnapshot = await db.collection('bookings').get();
         const bookings = allBookingsSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() }))
             .filter(booking => {
+                // Filtra per companyId
+                if (booking.companyId && booking.companyId !== currentUser.uid) {
+                    return false;
+                }
                 const bookingDate = booking.dateTime?.toDate();
                 if (!bookingDate) return false;
                 return bookingDate >= startDate && bookingDate <= endDate;

@@ -1152,6 +1152,57 @@ body {
     padding-bottom: 0.75rem;
 }
 
+/* Booking Link Card */
+.booking-link-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 2px solid var(--primary-light);
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow-md);
+}
+
+.booking-link-container {
+    margin-top: 1rem;
+}
+
+.link-input-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.link-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--border-radius);
+    font-size: 0.9rem;
+    background: var(--white);
+    font-family: 'Courier New', monospace;
+    color: var(--dark-color);
+}
+
+.link-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.link-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.success-message {
+    background: #d1fae5;
+    color: #065f46;
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius);
+    border-left: 4px solid var(--success-color);
+    font-size: 0.9rem;
+}
+
 /* Subscription Card */
 .subscription-card {
     background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);

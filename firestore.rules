@@ -30,31 +30,43 @@ service cloud.firestore {
     
     // Collection: bookings
     // Sistema B2B: gli admin possono creare/gestire tutte le prenotazioni
+    // Permette anche creazione pubblica tramite pagina booking.html
     match /bookings/{bookingId} {
       // Permetti lettura a tutti gli autenticati (admin vede tutto)
       allow read: if isAuthenticated();
       
-      // Permetti creazione a tutti gli autenticati (admin può creare per qualsiasi cliente)
-      allow create: if isAuthenticated();
+      // Permetti creazione:
+      // 1. Utenti autenticati (admin può creare per qualsiasi cliente)
+      // 2. Utenti non autenticati ma solo se hanno companyId valido e status pending
+      allow create: if isAuthenticated() || 
+                    (request.resource.data.companyId != null && 
+                     request.resource.data.status == 'pending' &&
+                     request.resource.data.source == 'public');
       
-      // Permetti aggiornamento a tutti gli autenticati (admin può aggiornare)
+      // Permetti aggiornamento solo a utenti autenticati (admin può aggiornare)
       allow update: if isAuthenticated();
       
-      // Permetti eliminazione a tutti gli autenticati (admin può eliminare)
+      // Permetti eliminazione solo a utenti autenticati (admin può eliminare)
       allow delete: if isAuthenticated();
     }
     
     // Collection: users
     // Sistema B2B: gli admin possono creare/gestire clienti
+    // Permette anche creazione pubblica tramite pagina booking.html
     match /users/{userId} {
       // Permetti lettura a tutti gli autenticati (admin può vedere clienti)
       allow read: if isAuthenticated();
       
-      // Permetti creazione a tutti gli autenticati (admin può creare clienti)
-      allow create: if isAuthenticated();
+      // Permetti creazione:
+      // 1. Utenti autenticati (admin può creare clienti)
+      // 2. Utenti non autenticati (per clienti che si registrano tramite pagina pubblica)
+      allow create: if isAuthenticated() || true;
       
       // Permetti aggiornamento a tutti gli autenticati (admin può aggiornare clienti)
-      allow update: if isAuthenticated();
+      // Permette anche aggiornamento pubblico durante creazione prenotazione
+      allow update: if isAuthenticated() || 
+                    (request.resource.data.email != null && 
+                     request.resource.data.displayName != null);
       
       // Permetti eliminazione solo al proprietario o admin (per sicurezza)
       allow delete: if isAuthenticated() && (isOwner(userId) || true);
@@ -67,9 +79,14 @@ service cloud.firestore {
     }
     
     // Collection: companies
-    // Profili azienda - solo il proprietario
+    // Profili azienda - solo il proprietario può scrivere
+    // Lettura pubblica permessa per mostrare info azienda nella pagina booking
     match /companies/{companyId} {
-      allow read, write: if isAuthenticated() && isOwner(companyId);
+      // Permetti lettura pubblica (per pagina booking.html)
+      allow read: if true;
+      
+      // Permetti scrittura solo al proprietario
+      allow write: if isAuthenticated() && isOwner(companyId);
     }
     
     // Collection: subscriptions

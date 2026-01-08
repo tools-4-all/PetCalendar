@@ -17,6 +17,7 @@ Sistema completo di prenotazioni online per toelettatori animali domestici. Sito
 - ✅ **Gestione prenotazioni** - Conferma, completa o annulla prenotazioni
 - ✅ **Statistiche** - Visualizza prenotazioni del giorno, in attesa e completate
 - ✅ **Dettagli completi** - Accesso a tutte le informazioni su animali e clienti
+- ✅ **Link prenotazione pubblica** - Condividi un link con i clienti per prenotazioni dirette
 
 ### Sistema di Notifiche:
 - ✅ **Promemoria automatici** via email
@@ -111,10 +112,12 @@ const firebaseConfig = {
 PetCalendar/
 ├── index.html          # Pagina principale per clienti
 ├── admin.html          # Pagina admin per toelettatori
+├── booking.html        # Pagina pubblica per prenotazioni clienti
 ├── styles.css          # Stili CSS
 ├── firebase-config.js  # Configurazione Firebase
 ├── app.js              # Logica applicazione clienti
 ├── admin.js            # Logica applicazione admin
+├── booking.js          # Logica prenotazioni pubbliche
 ├── notifications.js    # Sistema notifiche
 ├── payment.js          # Sistema pagamenti
 └── README.md           # Questo file
@@ -169,11 +172,46 @@ Il sito è completamente responsive e funziona su:
 - **EmailJS** - Notifiche email
 - **Stripe** - Pagamenti online
 
+## 🔗 Link Prenotazione Pubblica
+
+Il sistema include una pagina pubblica (`booking.html`) che permette ai clienti di prenotare direttamente senza registrazione.
+
+### Come Generare il Link
+
+1. **Accedi alla dashboard admin** (`admin.html`)
+2. **Registra la tua azienda** nella sezione Impostazioni > Profilo Azienda
+3. **Ottieni il tuo Company ID**: Il Company ID è il tuo User ID (UID) di Firebase Authentication
+   - Puoi trovarlo nella console del browser (F12) dopo il login: `currentUser.uid`
+   - Oppure controlla l'URL quando sei loggato nella dashboard
+4. **Genera il link**: 
+   ```
+   https://tuodominio.com/booking.html?companyId=TUO_USER_ID
+   ```
+
+### Caratteristiche della Pagina Pubblica
+
+- ✅ **Nessuna registrazione richiesta** - I clienti possono prenotare direttamente
+- ✅ **Controllo conflitti automatico** - Previene prenotazioni sovrapposte
+- ✅ **Validazione 24 ore** - Le prenotazioni devono essere fatte con almeno 24h di anticipo
+- ✅ **Creazione automatica cliente** - Il sistema crea automaticamente il profilo cliente
+- ✅ **Stato pending** - Tutte le prenotazioni pubbliche iniziano come "pending" e devono essere confermate dall'azienda
+
+### Gestione Prenotazioni dall'Admin
+
+Dalla dashboard admin puoi:
+- **Visualizzare** tutte le prenotazioni (incluse quelle pubbliche)
+- **Confermare** le prenotazioni in attesa
+- **Completare** le prenotazioni confermate
+- **Annullare** le prenotazioni se necessario
+
+Le prenotazioni pubbliche sono identificate dal campo `source: 'public'` nel database.
+
 ## 📝 Note
 
 - Per le notifiche SMS, puoi integrare Twilio o usare EmailJS con provider SMS
 - I promemoria automatici richiedono un sistema di cron job (es. Firebase Cloud Functions)
 - Per pagamenti completi con Stripe, considera l'uso di Firebase Cloud Functions
+- **Importante**: Assicurati di aver configurato il profilo azienda prima di condividere il link pubblico
 
 ## 🤝 Contribuire
 

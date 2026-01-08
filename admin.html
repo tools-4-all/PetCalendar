@@ -392,6 +392,58 @@
                     </div>
                 </div>
 
+                <!-- Booking Link Section -->
+                <div class="settings-section">
+                    <h3>Link Prenotazione Pubblica</h3>
+                    <div class="booking-link-card">
+                        <p style="margin-bottom: 1rem; color: var(--dark-color);">
+                            Condividi questo link con i tuoi clienti per permettere loro di prenotare direttamente online senza registrazione.
+                        </p>
+                        <div class="booking-link-container">
+                            <div class="form-group">
+                                <label>Il tuo link di prenotazione:</label>
+                                <div class="link-input-group">
+                                    <input type="text" id="bookingLink" readonly class="link-input" placeholder="Il link verrà generato automaticamente...">
+                                    <button id="copyLinkBtn" class="btn btn-primary">Copia Link</button>
+                                </div>
+                                <div style="margin-top: 0.5rem;">
+                                    <small id="linkStatus" style="color: #666; font-style: italic;">In attesa di generazione link...</small>
+                                </div>
+                                <small style="color: #666; margin-top: 0.5rem; display: block;">
+                                    I clienti che useranno questo link potranno prenotare direttamente. Le prenotazioni appariranno come "pending" e dovranno essere confermate da te.
+                                </small>
+                                <div class="info-box" style="margin-top: 1rem; padding: 1rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                                    <strong>⚠️ IMPORTANTE - Devi usare un server HTTP!</strong><br><br>
+                                    <strong>Non aprire i file direttamente</strong> (doppio click) perché Firebase non funziona con <code>file://</code>.<br><br>
+                                    
+                                    <strong>Come avviare il server:</strong><br>
+                                    <ol style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                                        <li>Apri il terminale nella directory del progetto</li>
+                                        <li>Esegui: <code style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">python3 -m http.server 8000</code></li>
+                                        <li>Apri nel browser: <code style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">http://localhost:8000/admin.html</code></li>
+                                    </ol>
+                                    
+                                    <strong>Alternative:</strong><br>
+                                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                                        <li>Node.js: <code>npx http-server -p 8000</code></li>
+                                        <li>PHP: <code>php -S localhost:8000</code></li>
+                                        <li>VS Code: Estensione "Live Server"</li>
+                                    </ul>
+                                    
+                                    <button onclick="testDirectBooking()" class="btn btn-secondary" style="margin-top: 0.5rem;">Testa booking.html direttamente</button>
+                                </div>
+                            </div>
+                            <div class="link-actions">
+                                <button id="testLinkBtn" class="btn btn-outline">Testa Link</button>
+                                <button id="shareLinkBtn" class="btn btn-outline">Condividi</button>
+                            </div>
+                        </div>
+                        <div id="linkCopiedMessage" class="success-message" style="display: none; margin-top: 1rem;">
+                            ✓ Link copiato negli appunti!
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Company Profile Section -->
                 <div class="settings-section">
                     <h3>Profilo Azienda</h3>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prenota Appuntamento - PetCalendar</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <style>
+        .booking-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .booking-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .booking-header h1 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .company-info {
+            background: var(--light-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .company-info h3 {
+            margin-top: 0;
+            color: var(--dark-color);
+        }
+
+        .booking-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .form-group label .required {
+            color: #e74c3c;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 1rem;
+            border-radius: 6px;
+            border-left: 4px solid #c33;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 1rem;
+            border-radius: 6px;
+            border-left: 4px solid #3c3;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .submit-btn {
+            background: var(--primary-color);
+            color: white;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .submit-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: #1976d2;
+        }
+
+        .conflict-warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .conflict-warning.show {
+            display: block;
+        }
+
+        .conflict-warning h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">PetCalendar</h1>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="booking-container">
+            <!-- Loading State -->
+            <div id="loadingState" class="loading">
+                <div class="spinner"></div>
+                <p>Caricamento informazioni...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" style="display: none; text-align: center; padding: 2rem;">
+                <h2 style="color: #e74c3c;">Errore</h2>
+                <p id="errorMessage" style="white-space: pre-line; margin: 1rem 0;">Link non valido o azienda non trovata.</p>
+                <div style="margin: 1rem 0;">
+                    <a href="index.html" class="btn btn-primary" style="margin-right: 1rem;">Torna alla Home</a>
+                    <button onclick="window.location.reload()" class="btn btn-secondary">Ricarica Pagina</button>
+                </div>
+                <div style="margin-top: 2rem; padding: 1rem; background: #f3f4f6; border-radius: 8px; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
+                    <strong>Informazioni per il debug:</strong><br>
+                    <small>URL corrente: <span id="currentUrlDebug"></span></small><br>
+                    <small>Company ID: <span id="companyIdDebug"></span></small>
+                </div>
+            </div>
+
+            <!-- Booking Form -->
+            <div id="bookingFormContainer" style="display: none;">
+                <div class="booking-header">
+                    <h1>Prenota il Tuo Appuntamento</h1>
+                    <p>Compila il form sottostante per prenotare un appuntamento</p>
+                </div>
+
+                <div id="companyInfo" class="company-info">
+                    <h3 id="companyName">Caricamento...</h3>
+                    <p id="companyDetails"></p>
+                </div>
+
+                <div id="errorMessage" class="error-message"></div>
+                <div id="successMessage" class="success-message"></div>
+                <div id="conflictWarning" class="conflict-warning">
+                    <h4>⚠️ Attenzione: Slot Occupato</h4>
+                    <p id="conflictDetails">Sembra che questo slot temporale sia già occupato. Ti consigliamo di scegliere un altro orario.</p>
+                </div>
+
+                <form id="bookingForm" class="booking-form">
+                    <div class="form-group">
+                        <label>Nome e Cognome <span class="required">*</span></label>
+                        <input type="text" id="clientName" placeholder="Mario Rossi" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Email <span class="required">*</span></label>
+                            <input type="email" id="clientEmail" placeholder="mario.rossi@email.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Telefono <span class="required">*</span></label>
+                            <input type="tel" id="clientPhone" placeholder="+39 123 456 7890" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Nome Animale <span class="required">*</span></label>
+                        <input type="text" id="animalName" placeholder="Fido" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tipo Animale <span class="required">*</span></label>
+                            <select id="animalType" required>
+                                <option value="">Seleziona...</option>
+                                <option value="cane">Cane</option>
+                                <option value="gatto">Gatto</option>
+                                <option value="altro">Altro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Razza (opzionale)</label>
+                            <input type="text" id="animalBreed" placeholder="Labrador">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Servizio Richiesto <span class="required">*</span></label>
+                        <select id="service" required>
+                            <option value="">Seleziona servizio...</option>
+                            <option value="toelettatura-completa">Toelettatura Completa</option>
+                            <option value="bagno">Bagno</option>
+                            <option value="taglio-unghie">Taglio Unghie</option>
+                            <option value="pulizia-orecchie">Pulizia Orecchie</option>
+                            <option value="taglio-pelo">Taglio Pelo</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Data <span class="required">*</span></label>
+                            <input type="date" id="bookingDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Ora <span class="required">*</span></label>
+                            <input type="time" id="bookingTime" required>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>Nota:</strong> Le prenotazioni devono essere effettuate con almeno 24 ore di anticipo. 
+                        L'azienda confermerà la prenotazione e ti contatterà per eventuali dettagli.
+                    </div>
+
+                    <div class="form-group">
+                        <label>Note Aggiuntive (opzionale)</label>
+                        <textarea id="notes" placeholder="Indica eventuali esigenze particolari, allergie, comportamenti dell'animale, ecc."></textarea>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="submit-btn">Invia Prenotazione</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="booking.js"></script>
+</body>
+</html>
+
