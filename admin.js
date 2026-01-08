@@ -185,14 +185,10 @@ function initTabs() {
             
             // Se si apre la tab settings, assicurati che il link sia generato
             if (targetTab === 'settings' && currentUser) {
-                console.log('Tab Settings aperta, verifico link...');
                 setTimeout(() => {
                     const linkInput = document.getElementById('bookingLink');
                     if (linkInput && (!linkInput.value || linkInput.value.trim() === '')) {
-                        console.log('Link vuoto, rigenero...');
                         loadBookingLink();
-                    } else if (linkInput) {
-                        console.log('Link già presente:', linkInput.value);
                     }
                 }, 100);
             }
@@ -457,32 +453,37 @@ function initEventListeners() {
     const copyLinkBtn = document.getElementById('copyLinkBtn');
     const testLinkBtn = document.getElementById('testLinkBtn');
     const shareLinkBtn = document.getElementById('shareLinkBtn');
+    const whatsappShareBtn = document.getElementById('whatsappShareBtn');
+    const downloadQRBtn = document.getElementById('downloadQRBtn');
     
     if (copyLinkBtn) {
         copyLinkBtn.addEventListener('click', () => {
-            console.log('Cliccato Copia Link');
             copyBookingLink();
         });
-    } else {
-        console.warn('Pulsante copyLinkBtn non trovato');
     }
     
     if (testLinkBtn) {
         testLinkBtn.addEventListener('click', () => {
-            console.log('Cliccato Testa Link');
             testBookingLink();
         });
-    } else {
-        console.warn('Pulsante testLinkBtn non trovato');
     }
     
     if (shareLinkBtn) {
         shareLinkBtn.addEventListener('click', () => {
-            console.log('Cliccato Condividi');
             shareBookingLink();
         });
-    } else {
-        console.warn('Pulsante shareLinkBtn non trovato');
+    }
+    
+    if (whatsappShareBtn) {
+        whatsappShareBtn.addEventListener('click', () => {
+            shareViaWhatsApp();
+        });
+    }
+    
+    if (downloadQRBtn) {
+        downloadQRBtn.addEventListener('click', () => {
+            downloadQRCode();
+        });
     }
 
     document.querySelectorAll('.plan-btn').forEach(btn => {
@@ -1995,35 +1996,60 @@ function loadBookingLink() {
     const origin = window.location.origin;
     const pathname = window.location.pathname;
     
-    console.log('=== Generazione Link (Produzione/Localhost) ===');
-    console.log('Origin:', origin);
-    console.log('Pathname:', pathname);
-    console.log('URL completo:', currentUrl);
+    // Verifica che currentUser.uid esista
+    if (!currentUser || !currentUser.uid) {
+        const linkInput = document.getElementById('bookingLink');
+        const linkStatus = document.getElementById('linkStatus');
+        if (linkInput) {
+            linkInput.value = 'ERRORE: Utente non autenticato. Effettua il login.';
+            linkInput.style.color = '#dc2626';
+        }
+        if (linkStatus) {
+            linkStatus.textContent = '✗ Errore: Utente non autenticato';
+            linkStatus.style.color = '#dc2626';
+        }
+        return;
+    }
     
     let bookingLink;
     
     // Metodo principale: sostituisci admin.html con booking.html nel pathname
+    // Aggiungiamo companyId sia nei query params che nell'hash come fallback
     if (pathname.includes('admin.html')) {
         // Sostituisci direttamente admin.html con booking.html
         const bookingPath = pathname.replace(/admin\.html.*$/, 'booking.html');
-        bookingLink = `${origin}${bookingPath}?companyId=${currentUser.uid}`;
-        console.log('✓ Metodo: Sostituzione diretta nel pathname');
+        // Aggiungi companyId sia nei query params che nell'hash (per server che perdono i parametri)
+        bookingLink = `${origin}${bookingPath}?companyId=${currentUser.uid}#companyId=${currentUser.uid}`;
     } else {
         // Se non c'è admin.html nel path, aggiungi booking.html alla fine del path
         // Rimuovi eventuali query string e hash
         const cleanPath = pathname.split('?')[0].split('#')[0];
         // Rimuovi il nome file finale se presente
         const dirPath = cleanPath.substring(0, cleanPath.lastIndexOf('/') + 1);
-        bookingLink = `${origin}${dirPath}booking.html?companyId=${currentUser.uid}`;
-        console.log('✓ Metodo: Aggiunta booking.html al path');
+        // Aggiungi companyId sia nei query params che nell'hash (per server che perdono i parametri)
+        bookingLink = `${origin}${dirPath}booking.html?companyId=${currentUser.uid}#companyId=${currentUser.uid}`;
     }
     
-    console.log('Link finale generato:', bookingLink);
+    // Verifica che il link contenga companyId
+    if (!bookingLink.includes('companyId=')) {
+        bookingLink = `${origin}${pathname.replace(/admin\.html.*$/, '')}booking.html?companyId=${currentUser.uid}#companyId=${currentUser.uid}`;
+    }
     
     const linkInput = document.getElementById('bookingLink');
     const linkStatus = document.getElementById('linkStatus');
     
     if (linkInput) {
+        // Verifica che il link contenga companyId
+        if (!bookingLink.includes('companyId=') || !bookingLink.includes(currentUser.uid)) {
+            linkInput.value = 'ERRORE: Link non valido - manca companyId';
+            linkInput.style.color = '#dc2626';
+            if (linkStatus) {
+                linkStatus.textContent = '✗ ERRORE: Link non valido. Ricarica la pagina.';
+                linkStatus.style.color = '#dc2626';
+            }
+            return;
+        }
+        
         linkInput.value = bookingLink;
         linkInput.style.color = ''; // Reset colore
         
@@ -2031,20 +2057,22 @@ function loadBookingLink() {
         const isProduction = !origin.includes('localhost') && !origin.includes('127.0.0.1');
         const envText = isProduction ? 'Produzione' : 'Localhost';
         
-        console.log(`✓ Link generato per ${envText}:`, bookingLink);
-        console.log('  Origin:', origin);
-        console.log('  Pathname:', pathname);
-        console.log('  Company ID:', currentUser.uid);
-        
         if (linkStatus) {
             linkStatus.textContent = `✓ Link generato correttamente (${envText})`;
             linkStatus.style.color = '#10b981';
             linkStatus.style.whiteSpace = 'normal';
         }
-    } else {
-        console.error('✗ ERRORE: Campo bookingLink non trovato nel DOM!');
-        console.log('Tentativo di trovare elementi simili:', document.querySelectorAll('[id*="link"], [id*="booking"]'));
         
+        // Salva companyId in sessionStorage come fallback (per server che perdono i parametri)
+        try {
+            sessionStorage.setItem('booking_companyId', currentUser.uid);
+        } catch (e) {
+            // Ignora errori di sessionStorage
+        }
+        
+        // Genera QR code dopo che il link è stato generato
+        generateQRCode(bookingLink);
+    } else {
         if (linkStatus) {
             linkStatus.textContent = '✗ Errore: campo link non trovato';
             linkStatus.style.color = '#dc2626';
@@ -2091,55 +2119,32 @@ function copyBookingLink() {
 
 // Testa il link aprendolo in una nuova scheda
 async function testBookingLink() {
-    console.log('=== testBookingLink chiamata ===');
-    
     const linkInput = document.getElementById('bookingLink');
     if (!linkInput) {
-        console.error('linkInput non trovato');
         alert('Errore: Campo link non trovato. Ricarica la pagina e riprova.');
         return;
     }
     
     const link = linkInput.value;
-    console.log('Link da testare:', link);
     
     if (!link || link.trim() === '') {
-        console.error('Link vuoto');
         alert('Errore: Il link è vuoto. Assicurati di essere loggato e che il link sia stato generato correttamente.');
         return;
     }
     
     // Verifica che il link contenga booking.html
     if (!link.includes('booking.html')) {
-        console.error('Link non contiene booking.html:', link);
         alert('Errore: Il link non sembra valido.\n\nLink attuale: ' + link + '\n\nControlla che booking.html esista nella stessa directory di admin.html');
         return;
     }
     
-    console.log('Aprendo link in nuova scheda...');
-    
     // Prova a verificare se il file esiste (solo se stesso dominio)
     try {
         const fileUrl = link.split('?')[0];
-        console.log('Verificando file:', fileUrl);
-        console.log('URL completo link:', link);
-        console.log('URL base file:', fileUrl);
-        
         const response = await fetch(fileUrl, { method: 'HEAD' });
-        console.log('Risposta fetch:', response.status, response.ok);
-        console.log('URL finale richiesto:', response.url || fileUrl);
         
         if (!response.ok && response.status === 404) {
-            console.error('File non trovato! URL richiesto:', fileUrl);
-            console.error('Origin corrente:', window.location.origin);
-            console.error('Pathname corrente:', window.location.pathname);
-            
-            // Prova a costruire URL alternativi
             const altUrl1 = window.location.origin + '/booking.html';
-            const altUrl2 = window.location.origin + window.location.pathname.replace('admin.html', 'booking.html');
-            console.log('URL alternativo 1:', altUrl1);
-            console.log('URL alternativo 2:', altUrl2);
-            
             const errorMsg = '⚠️ File booking.html non trovato (404)!\n\n' +
                   'URL richiesto: ' + fileUrl + '\n\n' +
                   'Possibili soluzioni:\n' +
@@ -2149,36 +2154,19 @@ async function testBookingLink() {
                   'Aprendo comunque il link per verificare...';
             
             alert(errorMsg);
-        } else if (response.ok) {
-            console.log('✓ File trovato correttamente!');
         }
     } catch (error) {
-        console.warn('Impossibile verificare il file (potrebbe essere normale se cross-origin):', error);
-        console.warn('Dettagli errore:', error.message);
-        // Continua comunque ad aprire il link
+        // Ignora errori di verifica (potrebbe essere normale se cross-origin)
     }
     
     // Apri in una nuova scheda
     try {
-        console.log('Tentativo di aprire:', link);
         const newWindow = window.open(link, '_blank');
         if (!newWindow) {
             alert('Impossibile aprire la nuova finestra. Verifica che il popup blocker non sia attivo.\n\n' +
                   'Alternativa: copia il link e aprilo manualmente nel browser:\n' + link);
-        } else {
-            console.log('Link aperto con successo in nuova finestra');
-            // Dopo 2 secondi, verifica se la pagina si è caricata
-            setTimeout(() => {
-                try {
-                    // Non possiamo verificare direttamente, ma possiamo suggerire
-                    console.log('Se vedi una pagina 404, il file booking.html potrebbe non essere nella posizione corretta.');
-                } catch (e) {
-                    // Ignora errori cross-origin
-                }
-            }, 2000);
         }
     } catch (error) {
-        console.error('Errore nell\'apertura del link:', error);
         alert('Errore nell\'apertura del link: ' + error.message + '\n\n' +
               'Prova a copiare il link e aprirlo manualmente:\n' + link);
     }
@@ -2221,11 +2209,6 @@ function testDirectBooking() {
     }
     
     const fullUrl = origin + bookingUrl;
-    console.log('Test diretto booking.html:', fullUrl);
-    console.log('Origin:', origin);
-    console.log('Pathname:', pathname);
-    console.log('Booking URL:', bookingUrl);
-    
     window.open(fullUrl, '_blank');
 }
 
@@ -2250,6 +2233,115 @@ function fallbackShare(link) {
           '- Messaggi\n' +
           '- Social media\n' +
           '- Sito web');
+}
+
+// Condividi via WhatsApp
+function shareViaWhatsApp() {
+    const linkInput = document.getElementById('bookingLink');
+    if (!linkInput) return;
+    
+    const link = linkInput.value;
+    if (!link || link.trim() === '') {
+        alert('Il link non è ancora stato generato. Attendi qualche secondo e riprova.');
+        return;
+    }
+    
+    // Messaggio precompilato per WhatsApp
+    const companyName = document.getElementById('companyName')?.value || 'il nostro salone';
+    const message = `🐾 Ciao! Prenota un appuntamento per il tuo animale presso ${companyName}:\n\n${link}\n\nPrenotazione rapida e semplice! 🐕🐈`;
+    
+    // Apri WhatsApp Web o app
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+}
+
+// Genera QR Code
+function generateQRCode(link) {
+    if (!link || link.trim() === '') return;
+    
+    const qrContainer = document.getElementById('qrCodeContainer');
+    const qrSection = document.getElementById('qrCodeSection');
+    const downloadBtn = document.getElementById('downloadQRBtn');
+    
+    if (!qrContainer || !qrSection) return;
+    
+    // Verifica che QRCode sia disponibile
+    if (typeof QRCode === 'undefined') {
+        return;
+    }
+    
+    // Pulisci container precedente
+    qrContainer.innerHTML = '';
+    
+    try {
+        // Crea canvas per QR code
+        const canvas = document.createElement('canvas');
+        qrContainer.appendChild(canvas);
+        
+        // Genera QR code usando la libreria qrcode
+        QRCode.toCanvas(canvas, link, {
+            width: 256,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#ffffff'
+            }
+        }, (error) => {
+            if (error) {
+                qrContainer.innerHTML = '<p style="color: #dc2626;">Errore nella generazione QR code</p>';
+                return;
+            }
+            
+            // Mostra sezione QR code
+            qrSection.style.display = 'block';
+            
+            // Mostra pulsante download
+            if (downloadBtn) {
+                downloadBtn.style.display = 'inline-block';
+            }
+        });
+    } catch (error) {
+        qrContainer.innerHTML = '<p style="color: #dc2626;">Errore nella generazione QR code</p>';
+    }
+}
+
+// Scarica QR Code come immagine
+function downloadQRCode() {
+    const qrContainer = document.getElementById('qrCodeContainer');
+    if (!qrContainer) return;
+    
+    const canvas = qrContainer.querySelector('canvas');
+    if (!canvas) {
+        alert('QR Code non ancora generato. Attendi qualche secondo.');
+        return;
+    }
+    
+    try {
+        // Converti canvas in blob (con fallback per browser vecchi)
+        if (canvas.toBlob) {
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `qr-code-prenotazioni-${new Date().toISOString().split('T')[0]}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        } else {
+            // Fallback per browser vecchi
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `qr-code-prenotazioni-${new Date().toISOString().split('T')[0]}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    } catch (error) {
+        alert('Errore nel download del QR code. Prova a fare screenshot manualmente.');
+    }
 }
 
 async function saveCompanyProfile() {

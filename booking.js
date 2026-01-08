@@ -16,26 +16,102 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Booking page loaded');
     console.log('Current URL:', window.location.href);
     
-    // Verifica che Firebase sia caricato
-    if (typeof firebase === 'undefined' || typeof db === 'undefined') {
-        console.error('Firebase non è stato caricato correttamente');
-        showInitialError('Errore: Firebase non è stato caricato. Verifica la connessione internet e ricarica la pagina.');
+    // Verifica se sta usando file:// invece di http://
+    const currentUrl = window.location.href;
+    const isFileProtocol = currentUrl.startsWith('file://');
+    
+    if (isFileProtocol) {
+        console.error('⚠️ ATTENZIONE: Stai usando file:// invece di un server HTTP!');
+        showInitialError('⚠️ IMPORTANTE: Devi usare un server HTTP!\n\n' +
+            'Firebase non funziona con file:// (doppio click sul file).\n\n' +
+            'Come avviare il server:\n' +
+            '1. Apri il terminale nella directory del progetto\n' +
+            '2. Esegui: python3 -m http.server 8000\n' +
+            '3. Apri nel browser: http://localhost:8000/booking.html?companyId=...\n\n' +
+            'Alternative:\n' +
+            '- Node.js: npx http-server -p 8000\n' +
+            '- PHP: php -S localhost:8000\n' +
+            '- VS Code: Estensione "Live Server"');
         return;
     }
     
-    // Ottieni companyId dall'URL
-    const urlParams = new URLSearchParams(window.location.search);
-    companyId = urlParams.get('companyId') || urlParams.get('id');
-    
-    console.log('Company ID from URL:', companyId);
+    // Aspetta che Firebase sia caricato (può richiedere qualche millisecondo)
+    setTimeout(() => {
+        // Verifica che Firebase sia caricato
+        if (typeof firebase === 'undefined') {
+            console.error('Firebase non è stato caricato correttamente');
+            showInitialError('Errore: Firebase non è stato caricato. Verifica che firebase-config.js sia presente e ricarica la pagina.');
+            return;
+        }
+        
+        if (typeof db === 'undefined') {
+            console.error('Database Firestore non inizializzato');
+            showInitialError('Errore: Database Firestore non inizializzato. Verifica la configurazione Firebase e ricarica la pagina.');
+            return;
+        }
+        
+        // Ottieni companyId dall'URL - prova diversi metodi
+        const urlParams = new URLSearchParams(window.location.search);
+        companyId = urlParams.get('companyId') || urlParams.get('id');
+        
+        // Metodo 2: Prova a prenderlo dal pathname (per server che fanno routing come /booking/:companyId)
+        if (!companyId) {
+            const pathParts = window.location.pathname.split('/').filter(p => p);
+            const bookingIndex = pathParts.findIndex(p => p === 'booking' || p.startsWith('booking'));
+            if (bookingIndex >= 0 && pathParts[bookingIndex + 1]) {
+                companyId = pathParts[bookingIndex + 1];
+                console.log('Company ID trovato nel pathname:', companyId);
+            }
+        }
+        
+        // Metodo 3: Prova a prenderlo dall'hash (#companyId=...)
+        if (!companyId && window.location.hash) {
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            companyId = hashParams.get('companyId') || hashParams.get('id');
+            if (companyId) {
+                console.log('Company ID trovato nell\'hash:', companyId);
+            }
+        }
+        
+        // Metodo 4: Prova a recuperarlo da sessionStorage (salvato quando si genera il link)
+        if (!companyId) {
+            const storedCompanyId = sessionStorage.getItem('booking_companyId');
+            if (storedCompanyId) {
+                companyId = storedCompanyId;
+                console.log('Company ID recuperato da sessionStorage:', companyId);
+            }
+        }
+        
+        console.log('Company ID from URL:', companyId);
+        console.log('URL completo:', window.location.href);
+        console.log('Pathname:', window.location.pathname);
+        console.log('Search params:', window.location.search);
+        console.log('Hash:', window.location.hash);
 
-    if (!companyId) {
-        console.error('CompanyId mancante nell\'URL');
-        showInitialError('Link non valido. Manca il parametro companyId.\n\nAssicurati di usare il link completo fornito dalla dashboard admin.');
-        return;
-    }
+        if (!companyId) {
+            console.error('CompanyId mancante nell\'URL');
+            console.error('Tentativi falliti:');
+            console.error('  - Query params:', window.location.search);
+            console.error('  - Hash:', window.location.hash);
+            console.error('  - Pathname:', window.location.pathname);
+            console.error('  - SessionStorage:', sessionStorage.getItem('booking_companyId'));
+            
+            showInitialError('Link non valido. Manca il parametro companyId.\n\n' +
+                'Possibili cause:\n' +
+                '1. Il server sta facendo un redirect che rimuove i parametri\n' +
+                '2. Il link è stato copiato senza i parametri\n' +
+                '3. Il browser ha perso i parametri durante la navigazione\n\n' +
+                'Soluzione:\n' +
+                '1. Vai alla dashboard admin\n' +
+                '2. Copia di nuovo il link completo dalla sezione "Link Prenotazione Pubblica"\n' +
+                '3. Assicurati che il link contenga "?companyId=..."\n' +
+                '4. Se il problema persiste, prova a incollare il link direttamente nella barra degli indirizzi\n\n' +
+                'URL attuale: ' + window.location.href);
+            return;
+        }
 
-    initBookingPage();
+        initBookingPage();
+    }, 100); // Aspetta 100ms per assicurarsi che gli script siano caricati
 });
 
 // Inizializza la pagina
@@ -68,14 +144,26 @@ async function initBookingPage() {
 
 // Carica dati azienda
 async function loadCompanyData() {
+    let companyDoc = null;
+    let docExists = false;
+    
     try {
-        const companyDoc = await db.collection('companies').doc(companyId).get();
+        companyDoc = await db.collection('companies').doc(companyId).get();
+        docExists = companyDoc.exists;
         
-        if (!companyDoc.exists) {
-            throw new Error('Azienda non trovata. Verifica che il link sia corretto.');
+        // Se il documento non esiste, usa dati di default (non creiamo il documento perché richiede autenticazione)
+        if (!docExists) {
+            console.log('Documento azienda non trovato, uso dati di default');
+            console.log('Nota: Compila il profilo azienda nella dashboard per personalizzare queste informazioni');
+            
+            // Usa dati di default senza creare il documento (richiede autenticazione)
+            companyData = {
+                id: companyId,
+                name: 'Azienda di Toelettatura'
+            };
+        } else {
+            companyData = { id: companyDoc.id, ...companyDoc.data() };
         }
-        
-        companyData = { id: companyDoc.id, ...companyDoc.data() };
         
         // Mostra informazioni azienda
         const companyNameEl = document.getElementById('companyName');
@@ -86,17 +174,45 @@ async function loadCompanyData() {
         }
         
         if (companyDetailsEl) {
-            let details = [];
-            if (companyData.address) details.push(companyData.address);
-            if (companyData.city) details.push(companyData.city);
-            if (companyData.phone) details.push(`Tel: ${companyData.phone}`);
-            if (companyData.email) details.push(`Email: ${companyData.email}`);
-            
-            companyDetailsEl.textContent = details.join(' | ') || 'Informazioni azienda';
+            if (!docExists) {
+                // Se il documento non esiste, mostra messaggio informativo
+                companyDetailsEl.textContent = 'Compila il profilo azienda nella dashboard per mostrare le informazioni qui.';
+                companyDetailsEl.style.fontStyle = 'italic';
+                companyDetailsEl.style.color = '#666';
+            } else {
+                let details = [];
+                if (companyData.address) details.push(companyData.address);
+                if (companyData.city) details.push(companyData.city);
+                if (companyData.phone) details.push(`Tel: ${companyData.phone}`);
+                if (companyData.email) details.push(`Email: ${companyData.email}`);
+                
+                companyDetailsEl.textContent = details.length > 0 
+                    ? details.join(' | ') 
+                    : 'Compila il profilo azienda nella dashboard per mostrare le informazioni qui.';
+            }
         }
     } catch (error) {
         console.error('Errore nel caricamento azienda:', error);
-        throw error;
+        // Anche in caso di errore, permette alla pagina di funzionare con dati di default
+        companyData = {
+            id: companyId,
+            name: 'Azienda di Toelettatura'
+        };
+        
+        const companyNameEl = document.getElementById('companyName');
+        const companyDetailsEl = document.getElementById('companyDetails');
+        
+        if (companyNameEl) {
+            companyNameEl.textContent = 'Azienda di Toelettatura';
+        }
+        
+        if (companyDetailsEl) {
+            companyDetailsEl.textContent = 'Errore nel caricamento informazioni azienda. La prenotazione funzionerà comunque.';
+            companyDetailsEl.style.fontStyle = 'italic';
+            companyDetailsEl.style.color = '#666';
+        }
+        
+        console.warn('Uso dati azienda di default a causa di errore:', error);
     }
 }
 

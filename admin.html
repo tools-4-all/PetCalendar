@@ -6,6 +6,7 @@
     <title>PetCalendar - Dashboard Professionale</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/locales/it.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -403,7 +404,7 @@
                             <div class="form-group">
                                 <label>Il tuo link di prenotazione:</label>
                                 <div class="link-input-group">
-                                    <input type="text" id="bookingLink" readonly class="link-input" placeholder="Il link verrà generato automaticamente...">
+                                    <input type="text" id="bookingLink" readonly class="link-input" placeholder="Il link verrà generato automaticamente..." style="font-family: monospace; font-size: 0.9rem;">
                                     <button id="copyLinkBtn" class="btn btn-primary">Copia Link</button>
                                 </div>
                                 <div style="margin-top: 0.5rem;">
@@ -412,30 +413,38 @@
                                 <small style="color: #666; margin-top: 0.5rem; display: block;">
                                     I clienti che useranno questo link potranno prenotare direttamente. Le prenotazioni appariranno come "pending" e dovranno essere confermate da te.
                                 </small>
-                                <div class="info-box" style="margin-top: 1rem; padding: 1rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-                                    <strong>⚠️ IMPORTANTE - Devi usare un server HTTP!</strong><br><br>
-                                    <strong>Non aprire i file direttamente</strong> (doppio click) perché Firebase non funziona con <code>file://</code>.<br><br>
-                                    
-                                    <strong>Come avviare il server:</strong><br>
-                                    <ol style="margin: 0.5rem 0; padding-left: 1.5rem;">
-                                        <li>Apri il terminale nella directory del progetto</li>
-                                        <li>Esegui: <code style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">python3 -m http.server 8000</code></li>
-                                        <li>Apri nel browser: <code style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">http://localhost:8000/admin.html</code></li>
-                                    </ol>
-                                    
-                                    <strong>Alternative:</strong><br>
-                                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
-                                        <li>Node.js: <code>npx http-server -p 8000</code></li>
-                                        <li>PHP: <code>php -S localhost:8000</code></li>
-                                        <li>VS Code: Estensione "Live Server"</li>
-                                    </ul>
-                                    
-                                    <button onclick="testDirectBooking()" class="btn btn-secondary" style="margin-top: 0.5rem;">Testa booking.html direttamente</button>
-                                </div>
                             </div>
-                            <div class="link-actions">
-                                <button id="testLinkBtn" class="btn btn-outline">Testa Link</button>
-                                <button id="shareLinkBtn" class="btn btn-outline">Condividi</button>
+                            <div class="link-actions" style="display: flex; gap: 0.5rem; margin-top: 1.5rem; flex-wrap: wrap;">
+                                <button id="shareLinkBtn" class="btn btn-outline" style="background: #f3f4f6; color: #1f2937; border: 2px solid #d1d5db; font-weight: 600;">Condividi</button>
+                                <button id="whatsappShareBtn" class="btn" style="background: #25D366; color: white; border: 2px solid #25D366; font-weight: 600;">
+                                    📱 WhatsApp
+                                </button>
+                            </div>
+                            
+                            <!-- QR Code Section -->
+                            <div id="qrCodeSection" style="margin-top: 2rem; padding: 1.5rem; background: #f9fafb; border-radius: 8px; text-align: center; display: none;">
+                                <h4 style="margin-top: 0; margin-bottom: 1rem;">QR Code per Prenotazioni</h4>
+                                <div id="qrCodeContainer" style="margin: 1rem 0;">
+                                    <!-- QR Code verrà generato qui -->
+                                </div>
+                                <p style="font-size: 0.9rem; color: #666; margin: 1rem 0;">
+                                    Stampa questo QR code e mettilo in negozio, sui biglietti da visita o sui volantini.<br>
+                                    I clienti potranno scansionarlo per prenotare direttamente!
+                                </p>
+                                <button id="downloadQRBtn" class="btn btn-secondary" style="display: none;">Scarica QR Code</button>
+                            </div>
+                            
+                            <!-- Suggerimenti per aumentare prenotazioni -->
+                            <div style="margin-top: 2rem; padding: 1.5rem; background: #e3f2fd; border-radius: 8px; border-left: 4px solid #2196F3;">
+                                <h4 style="margin-top: 0; color: #1976d2;">💡 Come Aumentare le Prenotazioni Online</h4>
+                                <ul style="margin: 1rem 0; padding-left: 1.5rem; color: #1565c0;">
+                                    <li><strong>Condividi il link su WhatsApp</strong> - Invia il link ai tuoi clienti esistenti</li>
+                                    <li><strong>Stampa il QR Code</strong> - Mettilo in negozio, sui biglietti da visita, volantini</li>
+                                    <li><strong>Pubblica sui social</strong> - Condividi il link su Facebook, Instagram</li>
+                                    <li><strong>Invia via email</strong> - Aggiungi il link nella firma email o in newsletter</li>
+                                    <li><strong>Offerta speciale</strong> - "Prenota online e risparmia 10%" per incentivare l'uso</li>
+                                    <li><strong>Menziona in negozio</strong> - Informa i clienti che possono prenotare online</li>
+                                </ul>
                             </div>
                         </div>
                         <div id="linkCopiedMessage" class="success-message" style="display: none; margin-top: 1rem;">
