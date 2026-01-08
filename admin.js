@@ -212,14 +212,6 @@ function initTabs() {
             // Carica dati specifici per tab
             if (targetTab === 'bookings') {
                 loadAllBookings();
-            } else if (targetTab === 'reports') {
-                // Genera automaticamente il report quando si apre il tab
-                setTimeout(() => {
-                    const reportsTabBtn = document.querySelector('.analytics-tab-btn[data-analytics="reports"]');
-                    if (reportsTabBtn && reportsTabBtn.classList.contains('active')) {
-                        generateReport();
-                    }
-                }, 200);
             } else if (targetTab === 'settings') {
                 loadSettings();
             }
@@ -371,8 +363,6 @@ function initEventListeners() {
             btn.classList.add('active');
             if (target === 'reports') {
                 document.getElementById('reportsContent').classList.add('active');
-                // Genera automaticamente il report quando si apre il tab
-                generateReport();
             } else if (target === 'advanced') {
                 document.getElementById('advancedAnalyticsContent').classList.add('active');
                 // Load analytics when tab is opened
