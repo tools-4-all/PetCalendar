@@ -944,6 +944,24 @@ body {
     margin-bottom: 1rem;
 }
 
+.report-summary {
+    padding: 1rem 0;
+}
+
+.report-summary p {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    background: var(--gray-50);
+    border-radius: var(--border-radius);
+    border-left: 3px solid var(--primary-color);
+}
+
+.report-summary p strong {
+    color: var(--primary-color);
+    display: inline-block;
+    min-width: 200px;
+}
+
 .report-table {
     width: 100%;
     border-collapse: collapse;
@@ -1641,6 +1659,192 @@ body {
 
     .danger-item button {
         width: 100%;
+    }
+}
+
+/* Analytics Styles */
+.analytics-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--gray-300);
+    background: var(--white);
+    padding: 0.5rem;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.analytics-tab-btn {
+    padding: 0.75rem 1.5rem;
+    background: var(--gray-100);
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--dark-color);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    position: relative;
+}
+
+.analytics-tab-btn:hover {
+    color: var(--primary-color);
+    background: var(--gray-200);
+    transform: translateY(-2px);
+}
+
+.analytics-tab-btn.active {
+    color: var(--white);
+    background: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.analytics-tab-btn.active:hover {
+    background: var(--primary-dark);
+    transform: translateY(0);
+}
+
+.analytics-content {
+    display: none;
+}
+
+.analytics-content.active {
+    display: block;
+}
+
+.analytics-filters {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.analytics-section {
+    background: var(--white);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+}
+
+.analytics-section h4 {
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    font-size: 1.25rem;
+}
+
+.chart-container {
+    position: relative;
+    height: 400px;
+    margin-bottom: 1rem;
+}
+
+.heatmap-container {
+    position: relative;
+    height: 500px;
+    margin-bottom: 1rem;
+}
+
+.predictions-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.prediction-card {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+    color: var(--white);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    text-align: center;
+    box-shadow: var(--shadow-md);
+}
+
+.prediction-card h5 {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.prediction-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.prediction-label {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    margin: 0;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.metric-card {
+    background: var(--gray-50);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    border-left: 4px solid var(--primary-color);
+}
+
+.metric-card h5 {
+    color: var(--gray-600);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.metric-change {
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}
+
+.metric-change.positive {
+    color: var(--success-color);
+}
+
+.metric-change.negative {
+    color: var(--danger-color);
+}
+
+@media (max-width: 768px) {
+    .analytics-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .analytics-filters select,
+    .analytics-filters input,
+    .analytics-filters button {
+        width: 100%;
+    }
+
+    .chart-container,
+    .heatmap-container {
+        height: 300px;
+    }
+
+    .predictions-container {
+        grid-template-columns: 1fr;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr;
     }
 }
 

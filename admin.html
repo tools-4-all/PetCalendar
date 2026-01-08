@@ -12,6 +12,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <nav class="navbar navbar-dashboard">
@@ -207,7 +208,15 @@
                     <button id="generateReportBtn" class="btn btn-primary">Genera Report</button>
                 </div>
             </div>
-            <div id="reportsContent" class="reports-content">
+            
+            <!-- Analytics Tab Navigation -->
+            <div class="analytics-tabs">
+                <button class="analytics-tab-btn active" data-analytics="reports">Report Base</button>
+                <button class="analytics-tab-btn" data-analytics="advanced">Analytics Avanzate</button>
+            </div>
+
+            <!-- Reports Content -->
+            <div id="reportsContent" class="reports-content analytics-content active">
                 <div class="report-section">
                     <h4>Fatturato</h4>
                     <div id="revenueReport"></div>
@@ -215,6 +224,120 @@
                 <div class="report-section">
                     <h4>Statistiche Servizi</h4>
                     <div id="servicesReport"></div>
+                </div>
+            </div>
+
+            <!-- Advanced Analytics Content -->
+            <div id="advancedAnalyticsContent" class="analytics-content">
+                <div class="analytics-filters">
+                    <select id="analyticsPeriod" class="filter-select">
+                        <option value="7">Ultimi 7 giorni</option>
+                        <option value="30" selected>Ultimi 30 giorni</option>
+                        <option value="90">Ultimi 90 giorni</option>
+                        <option value="180">Ultimi 6 mesi</option>
+                        <option value="365">Ultimo anno</option>
+                        <option value="custom">Personalizzato</option>
+                    </select>
+                    <div id="analyticsCustomPeriod" style="display: none; gap: 0.5rem; align-items: center;">
+                        <input type="date" id="analyticsStartDate" class="filter-input">
+                        <span>a</span>
+                        <input type="date" id="analyticsEndDate" class="filter-input">
+                    </div>
+                    <button id="loadAnalyticsBtn" class="btn btn-primary">Carica Analytics</button>
+                </div>
+
+                <!-- Revenue Trend Chart -->
+                <div class="analytics-section">
+                    <h4>Trend Fatturato</h4>
+                    <div class="chart-container">
+                        <canvas id="revenueTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Service Performance Chart -->
+                <div class="analytics-section">
+                    <h4>Performance Servizi</h4>
+                    <div class="chart-container">
+                        <canvas id="servicePerformanceChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Hourly Heatmap -->
+                <div class="analytics-section">
+                    <h4>Heatmap Orari - Giorni della Settimana</h4>
+                    <div class="heatmap-container">
+                        <canvas id="hourlyHeatmapChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Seasonality Analysis -->
+                <div class="analytics-section">
+                    <h4>Analisi Stagionalità</h4>
+                    <div class="chart-container">
+                        <canvas id="seasonalityChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Predictions -->
+                <div class="analytics-section">
+                    <h4>Previsioni Prenotazioni</h4>
+                    <div class="predictions-container">
+                        <div class="prediction-card">
+                            <h5>Prossimi 7 giorni</h5>
+                            <div class="prediction-value" id="prediction7days">-</div>
+                            <p class="prediction-label">prenotazioni previste</p>
+                        </div>
+                        <div class="prediction-card">
+                            <h5>Prossimi 30 giorni</h5>
+                            <div class="prediction-value" id="prediction30days">-</div>
+                            <p class="prediction-label">prenotazioni previste</p>
+                        </div>
+                        <div class="prediction-card">
+                            <h5>Fatturato Previsto (30gg)</h5>
+                            <div class="prediction-value" id="predictionRevenue">-</div>
+                            <p class="prediction-label">fatturato stimato</p>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="margin-top: 2rem;">
+                        <canvas id="predictionsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Key Metrics -->
+                <div class="analytics-section">
+                    <h4>Metriche Chiave</h4>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h5>Fatturato Medio Giornaliero</h5>
+                            <div class="metric-value" id="avgDailyRevenue">€0.00</div>
+                            <div class="metric-change" id="avgDailyRevenueChange">-</div>
+                        </div>
+                        <div class="metric-card">
+                            <h5>Prenotazioni Medie Giornaliere</h5>
+                            <div class="metric-value" id="avgDailyBookings">0</div>
+                            <div class="metric-change" id="avgDailyBookingsChange">-</div>
+                        </div>
+                        <div class="metric-card">
+                            <h5>Ticket Medio</h5>
+                            <div class="metric-value" id="avgTicket">€0.00</div>
+                            <div class="metric-change" id="avgTicketChange">-</div>
+                        </div>
+                        <div class="metric-card">
+                            <h5>Tasso di Completamento</h5>
+                            <div class="metric-value" id="completionRate">0%</div>
+                            <div class="metric-change" id="completionRateChange">-</div>
+                        </div>
+                        <div class="metric-card">
+                            <h5>Giorno Più Affollato</h5>
+                            <div class="metric-value" id="busiestDay">-</div>
+                            <div class="metric-change" id="busiestDayChange">-</div>
+                        </div>
+                        <div class="metric-card">
+                            <h5>Ora di Picco</h5>
+                            <div class="metric-value" id="peakHour">-</div>
+                            <div class="metric-change" id="peakHourChange">-</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

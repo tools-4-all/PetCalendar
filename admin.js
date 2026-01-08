@@ -213,8 +213,13 @@ function initTabs() {
             if (targetTab === 'bookings') {
                 loadAllBookings();
             } else if (targetTab === 'reports') {
-                // Non generare automaticamente il report - solo quando si clicca sul bottone
-                // Il report verrà generato solo quando l'utente clicca su "Genera Report"
+                // Genera automaticamente il report quando si apre il tab
+                setTimeout(() => {
+                    const reportsTabBtn = document.querySelector('.analytics-tab-btn[data-analytics="reports"]');
+                    if (reportsTabBtn && reportsTabBtn.classList.contains('active')) {
+                        generateReport();
+                    }
+                }, 200);
             } else if (targetTab === 'settings') {
                 loadSettings();
             }
@@ -328,6 +333,20 @@ function initEventListeners() {
     });
 
     document.getElementById('generateReportBtn')?.addEventListener('click', () => {
+        // Assicurati che il tab "Report Base" sia attivo
+        const reportsTabBtn = document.querySelector('.analytics-tab-btn[data-analytics="reports"]');
+        const advancedTabBtn = document.querySelector('.analytics-tab-btn[data-analytics="advanced"]');
+        const reportsContent = document.getElementById('reportsContent');
+        const advancedContent = document.getElementById('advancedAnalyticsContent');
+        
+        if (reportsTabBtn && advancedTabBtn && reportsContent && advancedContent) {
+            // Attiva il tab Report Base
+            reportsTabBtn.classList.add('active');
+            advancedTabBtn.classList.remove('active');
+            reportsContent.classList.add('active');
+            advancedContent.classList.remove('active');
+        }
+        
         generateReport();
     });
     
@@ -337,6 +356,42 @@ function initEventListeners() {
         if (customPeriod) {
             customPeriod.style.display = e.target.value === 'custom' ? 'block' : 'none';
         }
+    });
+
+    // Analytics Tabs
+    document.querySelectorAll('.analytics-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.analytics;
+            
+            // Remove active from all
+            document.querySelectorAll('.analytics-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.analytics-content').forEach(c => c.classList.remove('active'));
+            
+            // Add active to selected
+            btn.classList.add('active');
+            if (target === 'reports') {
+                document.getElementById('reportsContent').classList.add('active');
+                // Genera automaticamente il report quando si apre il tab
+                generateReport();
+            } else if (target === 'advanced') {
+                document.getElementById('advancedAnalyticsContent').classList.add('active');
+                // Load analytics when tab is opened
+                loadAdvancedAnalytics();
+            }
+        });
+    });
+
+    // Analytics Period
+    document.getElementById('analyticsPeriod')?.addEventListener('change', (e) => {
+        const customPeriod = document.getElementById('analyticsCustomPeriod');
+        if (customPeriod) {
+            customPeriod.style.display = e.target.value === 'custom' ? 'flex' : 'none';
+        }
+    });
+
+    // Load Analytics Button
+    document.getElementById('loadAnalyticsBtn')?.addEventListener('click', () => {
+        loadAdvancedAnalytics();
     });
 
     // Export
@@ -1133,6 +1188,12 @@ async function generateReport() {
         // Report Fatturato
         const revenueEl = document.getElementById('revenueReport');
         if (revenueEl) {
+            // Assicurati che il contenuto sia visibile
+            const reportsContent = document.getElementById('reportsContent');
+            if (reportsContent) {
+                reportsContent.classList.add('active');
+            }
+            
             revenueEl.innerHTML = `
                 <div class="report-summary">
                     <p><strong>Fatturato Completate:</strong> €${totalRevenue.toFixed(2)}</p>
@@ -1144,6 +1205,7 @@ async function generateReport() {
                     <p><strong>Annullate:</strong> ${statusCounts.cancelled}</p>
                 </div>
             `;
+            console.log('Report Fatturato aggiornato');
         } else {
             console.error('Elemento revenueReport non trovato nel DOM');
             alert('Errore: elemento revenueReport non trovato');
@@ -1172,8 +1234,10 @@ async function generateReport() {
                     </thead>
                     <tbody>${servicesHtml}</tbody>
                 </table>`;
+                console.log('Report Servizi aggiornato');
             } else {
                 servicesEl.innerHTML = '<p>Nessun servizio completato nel periodo selezionato</p>';
+                console.log('Nessun servizio completato nel periodo');
             }
         } else {
             console.error('Elemento servicesReport non trovato');
@@ -1922,5 +1986,640 @@ async function createAdminBooking() {
         console.error('Errore nella creazione prenotazione:', error);
         alert('Errore nella creazione della prenotazione: ' + error.message);
     }
+}
+
+// ============================================
+// ADVANCED ANALYTICS
+// ============================================
+
+let analyticsCharts = {
+    revenueTrend: null,
+    servicePerformance: null,
+    hourlyHeatmap: null,
+    seasonality: null,
+    predictions: null
+};
+
+// Load Advanced Analytics
+async function loadAdvancedAnalytics() {
+    try {
+        const period = document.getElementById('analyticsPeriod').value;
+        let startDate, endDate;
+        
+        const now = new Date();
+        
+        if (period === 'custom') {
+            const startInput = document.getElementById('analyticsStartDate').value;
+            const endInput = document.getElementById('analyticsEndDate').value;
+            if (!startInput || !endInput) {
+                alert('Seleziona data inizio e data fine');
+                return;
+            }
+            startDate = new Date(startInput);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(endInput);
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            const days = parseInt(period);
+            startDate = new Date(now);
+            startDate.setDate(startDate.getDate() - days);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(now);
+            endDate.setHours(23, 59, 59, 999);
+        }
+        
+        // Load all bookings in the period
+        // NOTA: I dati vengono caricati da Firestore (database cloud), non sono in locale
+        // db.collection('bookings') accede al database Firebase Firestore
+        const allBookingsSnapshot = await db.collection('bookings').get();
+        const bookings = allBookingsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(booking => {
+                const bookingDate = booking.dateTime?.toDate();
+                if (!bookingDate) return false;
+                return bookingDate >= startDate && bookingDate <= endDate;
+            });
+        
+        if (bookings.length === 0) {
+            alert('Nessun dato disponibile per il periodo selezionato');
+            return;
+        }
+        
+        // Calculate previous period for comparison
+        const periodDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+        const prevStartDate = new Date(startDate);
+        prevStartDate.setDate(prevStartDate.getDate() - periodDays);
+        const prevEndDate = new Date(startDate);
+        
+        const prevBookings = allBookingsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(booking => {
+                const bookingDate = booking.dateTime?.toDate();
+                if (!bookingDate) return false;
+                return bookingDate >= prevStartDate && bookingDate < startDate;
+            });
+        
+        // Generate all analytics
+        generateRevenueTrendChart(bookings, startDate, endDate);
+        generateServicePerformanceChart(bookings);
+        generateHourlyHeatmap(bookings);
+        generateSeasonalityChart(bookings);
+        generatePredictions(bookings);
+        calculateKeyMetrics(bookings, prevBookings);
+        
+    } catch (error) {
+        console.error('Errore nel caricamento analytics:', error);
+        alert('Errore nel caricamento analytics: ' + error.message);
+    }
+}
+
+// Revenue Trend Chart
+function generateRevenueTrendChart(bookings, startDate, endDate) {
+    const ctx = document.getElementById('revenueTrendChart');
+    if (!ctx) return;
+    
+    // Destroy existing chart
+    if (analyticsCharts.revenueTrend) {
+        analyticsCharts.revenueTrend.destroy();
+    }
+    
+    // Group by day
+    const daysMap = {};
+    const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    const labels = [];
+    
+    for (let i = 0; i <= days; i++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + i);
+        const dateKey = date.toISOString().split('T')[0];
+        daysMap[dateKey] = 0;
+        labels.push(date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }));
+    }
+    
+    bookings.forEach(booking => {
+        if (booking.status === 'completed' && booking.price) {
+            const date = booking.dateTime?.toDate();
+            if (date) {
+                const dateKey = date.toISOString().split('T')[0];
+                if (daysMap[dateKey] !== undefined) {
+                    daysMap[dateKey] += booking.price || 0;
+                }
+            }
+        }
+    });
+    
+    const revenueData = Object.values(daysMap);
+    
+    analyticsCharts.revenueTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Fatturato Giornaliero',
+                data: revenueData,
+                borderColor: 'rgb(30, 64, 175)',
+                backgroundColor: 'rgba(30, 64, 175, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return '€' + context.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '€' + value.toFixed(0);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Service Performance Chart
+function generateServicePerformanceChart(bookings) {
+    const ctx = document.getElementById('servicePerformanceChart');
+    if (!ctx) return;
+    
+    if (analyticsCharts.servicePerformance) {
+        analyticsCharts.servicePerformance.destroy();
+    }
+    
+    const serviceNames = {
+        'toelettatura-completa': 'Toelettatura Completa',
+        'bagno': 'Bagno',
+        'taglio-unghie': 'Taglio Unghie',
+        'pulizia-orecchie': 'Pulizia Orecchie',
+        'taglio-pelo': 'Taglio Pelo'
+    };
+    
+    const serviceStats = {};
+    
+    bookings.forEach(booking => {
+        if (booking.status === 'completed') {
+            const service = booking.service || 'unknown';
+            if (!serviceStats[service]) {
+                serviceStats[service] = { count: 0, revenue: 0 };
+            }
+            serviceStats[service].count++;
+            serviceStats[service].revenue += booking.price || 0;
+        }
+    });
+    
+    const labels = Object.keys(serviceStats).map(s => serviceNames[s] || s);
+    const countData = Object.values(serviceStats).map(s => s.count);
+    const revenueData = Object.values(serviceStats).map(s => s.revenue);
+    
+    analyticsCharts.servicePerformance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Quantità',
+                    data: countData,
+                    backgroundColor: 'rgba(30, 64, 175, 0.6)',
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Fatturato (€)',
+                    data: revenueData,
+                    backgroundColor: 'rgba(13, 148, 136, 0.6)',
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Quantità'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Fatturato (€)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Hourly Heatmap
+function generateHourlyHeatmap(bookings) {
+    const ctx = document.getElementById('hourlyHeatmapChart');
+    if (!ctx) return;
+    
+    if (analyticsCharts.hourlyHeatmap) {
+        analyticsCharts.hourlyHeatmap.destroy();
+    }
+    
+    const daysOfWeek = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+    const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8-20
+    
+    // Initialize heatmap data
+    const heatmapData = {};
+    daysOfWeek.forEach(day => {
+        hours.forEach(hour => {
+            heatmapData[`${day}-${hour}`] = 0;
+        });
+    });
+    
+    bookings.forEach(booking => {
+        const date = booking.dateTime?.toDate();
+        if (date) {
+            const dayOfWeek = date.getDay() === 0 ? 6 : date.getDay() - 1; // Monday = 0
+            const hour = date.getHours();
+            if (hour >= 8 && hour <= 20) {
+                const key = `${daysOfWeek[dayOfWeek]}-${hour}`;
+                if (heatmapData[key] !== undefined) {
+                    heatmapData[key]++;
+                }
+            }
+        }
+    });
+    
+    // Convert to matrix format for heatmap
+    const data = daysOfWeek.map(day => {
+        return hours.map(hour => heatmapData[`${day}-${hour}`] || 0);
+    });
+    
+    const maxValue = Math.max(...data.flat());
+    
+    analyticsCharts.hourlyHeatmap = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: daysOfWeek,
+            datasets: hours.map((hour, hourIndex) => ({
+                label: `${hour}:00`,
+                data: data.map(dayData => dayData[hourIndex]),
+                backgroundColor: function(context) {
+                    const value = context.parsed.y;
+                    const intensity = maxValue > 0 ? value / maxValue : 0;
+                    return `rgba(30, 64, 175, ${0.3 + intensity * 0.7})`;
+                }
+            }))
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y} prenotazioni`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    title: {
+                        display: true,
+                        text: 'Giorno della Settimana'
+                    }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Numero Prenotazioni'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Seasonality Chart
+function generateSeasonalityChart(bookings) {
+    const ctx = document.getElementById('seasonalityChart');
+    if (!ctx) return;
+    
+    if (analyticsCharts.seasonality) {
+        analyticsCharts.seasonality.destroy();
+    }
+    
+    const months = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+    const monthData = Array(12).fill(0);
+    const monthRevenue = Array(12).fill(0);
+    
+    bookings.forEach(booking => {
+        const date = booking.dateTime?.toDate();
+        if (date) {
+            const month = date.getMonth();
+            monthData[month]++;
+            if (booking.status === 'completed') {
+                monthRevenue[month] += booking.price || 0;
+            }
+        }
+    });
+    
+    analyticsCharts.seasonality = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: [
+                {
+                    label: 'Prenotazioni',
+                    data: monthData,
+                    borderColor: 'rgb(30, 64, 175)',
+                    backgroundColor: 'rgba(30, 64, 175, 0.1)',
+                    yAxisID: 'y',
+                    tension: 0.4
+                },
+                {
+                    label: 'Fatturato (€)',
+                    data: monthRevenue,
+                    borderColor: 'rgb(13, 148, 136)',
+                    backgroundColor: 'rgba(13, 148, 136, 0.1)',
+                    yAxisID: 'y1',
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Prenotazioni'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Fatturato (€)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Predictions
+function generatePredictions(bookings) {
+    // Simple moving average prediction
+    const completedBookings = bookings.filter(b => b.status === 'completed');
+    
+    // Calculate average bookings per day
+    const bookingDates = completedBookings.map(b => b.dateTime?.toDate()).filter(d => d);
+    if (bookingDates.length === 0) {
+        document.getElementById('prediction7days').textContent = '-';
+        document.getElementById('prediction30days').textContent = '-';
+        document.getElementById('predictionRevenue').textContent = '-';
+        // Clear prediction chart
+        const ctx = document.getElementById('predictionsChart');
+        if (ctx && analyticsCharts.predictions) {
+            analyticsCharts.predictions.destroy();
+            analyticsCharts.predictions = null;
+        }
+        return;
+    }
+    
+    const firstDate = new Date(Math.min(...bookingDates.map(d => d.getTime())));
+    const lastDate = new Date(Math.max(...bookingDates.map(d => d.getTime())));
+    const daysDiff = Math.ceil((lastDate - firstDate) / (1000 * 60 * 60 * 24)) || 1;
+    const avgBookingsPerDay = completedBookings.length / daysDiff;
+    
+    const totalRevenue = completedBookings.reduce((sum, b) => sum + (b.price || 0), 0);
+    const avgRevenue = completedBookings.length > 0 ? totalRevenue / completedBookings.length : 0;
+    
+    // Predictions
+    const prediction7 = Math.round(avgBookingsPerDay * 7);
+    const prediction30 = Math.round(avgBookingsPerDay * 30);
+    const predictionRevenue = Math.round(avgBookingsPerDay * 30 * avgRevenue);
+    
+    document.getElementById('prediction7days').textContent = prediction7;
+    document.getElementById('prediction30days').textContent = prediction30;
+    document.getElementById('predictionRevenue').textContent = '€' + predictionRevenue.toFixed(2);
+    
+    // Prediction Chart
+    const ctx = document.getElementById('predictionsChart');
+    if (!ctx) return;
+    
+    if (analyticsCharts.predictions) {
+        analyticsCharts.predictions.destroy();
+    }
+    
+    // Last 7 days actual vs next 7 days predicted
+    const now = new Date();
+    const last7Days = [];
+    const next7Days = [];
+    
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+        const dayBookings = bookings.filter(b => {
+            const bDate = b.dateTime?.toDate();
+            return bDate && bDate.toISOString().split('T')[0] === dateKey;
+        }).length;
+        last7Days.push(dayBookings);
+    }
+    
+    for (let i = 1; i <= 7; i++) {
+        next7Days.push(Math.round(avgBookingsPerDay));
+    }
+    
+    const labels = [];
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        labels.push(date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }));
+    }
+    for (let i = 1; i <= 7; i++) {
+        const date = new Date(now);
+        date.setDate(date.getDate() + i);
+        labels.push(date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }));
+    }
+    
+    analyticsCharts.predictions = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Reale',
+                    data: [...last7Days, ...Array(7).fill(null)],
+                    borderColor: 'rgb(30, 64, 175)',
+                    backgroundColor: 'rgba(30, 64, 175, 0.1)',
+                    tension: 0.4,
+                    borderDash: []
+                },
+                {
+                    label: 'Previsione',
+                    data: [...Array(7).fill(null), ...next7Days],
+                    borderColor: 'rgb(13, 148, 136)',
+                    backgroundColor: 'rgba(13, 148, 136, 0.1)',
+                    tension: 0.4,
+                    borderDash: [5, 5]
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Prenotazioni'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Calculate Key Metrics
+function calculateKeyMetrics(bookings, prevBookings) {
+    const completed = bookings.filter(b => b.status === 'completed');
+    const prevCompleted = prevBookings.filter(b => b.status === 'completed');
+    
+    // Average Daily Revenue
+    const bookingDates = bookings.map(b => b.dateTime?.toDate()).filter(d => d);
+    const days = bookingDates.length > 0 ? Math.ceil((new Date(Math.max(...bookingDates.map(d => d.getTime()))) - new Date(Math.min(...bookingDates.map(d => d.getTime())))) / (1000 * 60 * 60 * 24)) || 1 : 1;
+    const totalRevenue = completed.reduce((sum, b) => sum + (b.price || 0), 0);
+    const avgDailyRevenue = days > 0 ? totalRevenue / days : 0;
+    
+    const prevBookingDates = prevBookings.map(b => b.dateTime?.toDate()).filter(d => d);
+    const prevDays = prevBookingDates.length > 0 ? Math.ceil((new Date(Math.max(...prevBookingDates.map(d => d.getTime()))) - new Date(Math.min(...prevBookingDates.map(d => d.getTime())))) / (1000 * 60 * 60 * 24)) || 1 : 1;
+    const prevTotalRevenue = prevCompleted.reduce((sum, b) => sum + (b.price || 0), 0);
+    const prevAvgDailyRevenue = prevDays > 0 ? prevTotalRevenue / prevDays : 0;
+    const revenueChange = prevAvgDailyRevenue > 0 ? ((avgDailyRevenue - prevAvgDailyRevenue) / prevAvgDailyRevenue * 100) : 0;
+    
+    document.getElementById('avgDailyRevenue').textContent = '€' + avgDailyRevenue.toFixed(2);
+    const revenueChangeEl = document.getElementById('avgDailyRevenueChange');
+    revenueChangeEl.textContent = revenueChange >= 0 ? `+${revenueChange.toFixed(1)}%` : `${revenueChange.toFixed(1)}%`;
+    revenueChangeEl.className = 'metric-change ' + (revenueChange >= 0 ? 'positive' : 'negative');
+    
+    // Average Daily Bookings
+    const avgDailyBookings = bookings.length / days;
+    const prevAvgDailyBookings = prevBookings.length / prevDays;
+    const bookingsChange = prevAvgDailyBookings > 0 ? ((avgDailyBookings - prevAvgDailyBookings) / prevAvgDailyBookings * 100) : 0;
+    
+    document.getElementById('avgDailyBookings').textContent = Math.round(avgDailyBookings);
+    const bookingsChangeEl = document.getElementById('avgDailyBookingsChange');
+    bookingsChangeEl.textContent = bookingsChange >= 0 ? `+${bookingsChange.toFixed(1)}%` : `${bookingsChange.toFixed(1)}%`;
+    bookingsChangeEl.className = 'metric-change ' + (bookingsChange >= 0 ? 'positive' : 'negative');
+    
+    // Average Ticket
+    const avgTicket = completed.length > 0 ? totalRevenue / completed.length : 0;
+    const prevAvgTicket = prevCompleted.length > 0 ? prevTotalRevenue / prevCompleted.length : 0;
+    const ticketChange = prevAvgTicket > 0 ? ((avgTicket - prevAvgTicket) / prevAvgTicket * 100) : 0;
+    
+    document.getElementById('avgTicket').textContent = '€' + avgTicket.toFixed(2);
+    const ticketChangeEl = document.getElementById('avgTicketChange');
+    ticketChangeEl.textContent = ticketChange >= 0 ? `+${ticketChange.toFixed(1)}%` : `${ticketChange.toFixed(1)}%`;
+    ticketChangeEl.className = 'metric-change ' + (ticketChange >= 0 ? 'positive' : 'negative');
+    
+    // Completion Rate
+    const completionRate = bookings.length > 0 ? (completed.length / bookings.length * 100) : 0;
+    const prevCompletionRate = prevBookings.length > 0 ? (prevCompleted.length / prevBookings.length * 100) : 0;
+    const completionChange = prevCompletionRate > 0 ? (completionRate - prevCompletionRate) : 0;
+    
+    document.getElementById('completionRate').textContent = completionRate.toFixed(1) + '%';
+    const completionChangeEl = document.getElementById('completionRateChange');
+    completionChangeEl.textContent = completionChange >= 0 ? `+${completionChange.toFixed(1)}%` : `${completionChange.toFixed(1)}%`;
+    completionChangeEl.className = 'metric-change ' + (completionChange >= 0 ? 'positive' : 'negative');
+    
+    // Busiest Day
+    const dayCounts = {};
+    bookings.forEach(b => {
+        const date = b.dateTime?.toDate();
+        if (date) {
+            const dayName = date.toLocaleDateString('it-IT', { weekday: 'long' });
+            dayCounts[dayName] = (dayCounts[dayName] || 0) + 1;
+        }
+    });
+    const busiestDay = Object.keys(dayCounts).length > 0 
+        ? Object.keys(dayCounts).reduce((a, b) => dayCounts[a] > dayCounts[b] ? a : b)
+        : '-';
+    document.getElementById('busiestDay').textContent = busiestDay;
+    
+    // Peak Hour
+    const hourCounts = {};
+    bookings.forEach(b => {
+        const date = b.dateTime?.toDate();
+        if (date) {
+            const hour = date.getHours();
+            hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+        }
+    });
+    const peakHour = Object.keys(hourCounts).length > 0
+        ? Object.keys(hourCounts).reduce((a, b) => hourCounts[a] > hourCounts[b] ? a : b)
+        : '-';
+    document.getElementById('peakHour').textContent = peakHour !== '-' ? peakHour + ':00' : '-';
 }
 
