@@ -212,6 +212,16 @@ function initTabs() {
             // Carica dati specifici per tab
             if (targetTab === 'bookings') {
                 loadAllBookings();
+            } else if (targetTab === 'reports') {
+                // Carica dati e grafici quando si apre la tab Reports
+                // Assicurati che il contenuto sia visibile
+                const advancedContent = document.getElementById('advancedAnalyticsContent');
+                if (advancedContent) {
+                    advancedContent.classList.add('active');
+                }
+                setTimeout(() => {
+                    loadReportData();
+                }, 200);
             } else if (targetTab === 'settings') {
                 loadSettings();
             }
@@ -325,51 +335,44 @@ function initEventListeners() {
     });
 
     document.getElementById('generateReportBtn')?.addEventListener('click', () => {
-        // Assicurati che il tab "Report Base" sia attivo
-        const reportsTabBtn = document.querySelector('.analytics-tab-btn[data-analytics="reports"]');
-        const advancedTabBtn = document.querySelector('.analytics-tab-btn[data-analytics="advanced"]');
-        const reportsContent = document.getElementById('reportsContent');
-        const advancedContent = document.getElementById('advancedAnalyticsContent');
-        
-        if (reportsTabBtn && advancedTabBtn && reportsContent && advancedContent) {
-            // Attiva il tab Report Base
-            reportsTabBtn.classList.add('active');
-            advancedTabBtn.classList.remove('active');
-            reportsContent.classList.add('active');
-            advancedContent.classList.remove('active');
-        }
-        
         generateReport();
     });
     
-    // Mostra/nascondi periodo personalizzato
+    // Mostra/nascondi periodo personalizzato e aggiorna i grafici
     document.getElementById('reportPeriod')?.addEventListener('change', (e) => {
         const customPeriod = document.getElementById('customPeriod');
         if (customPeriod) {
             customPeriod.style.display = e.target.value === 'custom' ? 'block' : 'none';
         }
+        // Aggiorna i grafici quando cambia il periodo del report
+        loadReportData();
+    });
+    
+    // Aggiorna i grafici quando cambiano le date personalizzate del report
+    document.getElementById('reportStartDate')?.addEventListener('change', () => {
+        const period = document.getElementById('reportPeriod').value;
+        if (period === 'custom') {
+            const startDate = document.getElementById('reportStartDate').value;
+            const endDate = document.getElementById('reportEndDate').value;
+            if (startDate && endDate) {
+                loadReportData();
+            }
+        }
+    });
+    
+    document.getElementById('reportEndDate')?.addEventListener('change', () => {
+        const period = document.getElementById('reportPeriod').value;
+        if (period === 'custom') {
+            const startDate = document.getElementById('reportStartDate').value;
+            const endDate = document.getElementById('reportEndDate').value;
+            if (startDate && endDate) {
+                loadReportData();
+            }
+        }
     });
 
-    // Analytics Tabs
-    document.querySelectorAll('.analytics-tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const target = btn.dataset.analytics;
-            
-            // Remove active from all
-            document.querySelectorAll('.analytics-tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.analytics-content').forEach(c => c.classList.remove('active'));
-            
-            // Add active to selected
-            btn.classList.add('active');
-            if (target === 'reports') {
-                document.getElementById('reportsContent').classList.add('active');
-            } else if (target === 'advanced') {
-                document.getElementById('advancedAnalyticsContent').classList.add('active');
-                // Load analytics when tab is opened
-                loadAdvancedAnalytics();
-            }
-        });
-    });
+    // Carica analytics quando si apre la tab Reports
+    // (gestito in initTabs quando si clicca sulla tab reports)
 
     // Analytics Period
     document.getElementById('analyticsPeriod')?.addEventListener('change', (e) => {
@@ -377,11 +380,40 @@ function initEventListeners() {
         if (customPeriod) {
             customPeriod.style.display = e.target.value === 'custom' ? 'flex' : 'none';
         }
+        // Aggiorna automaticamente i grafici se il tab advanced è attivo
+        const advancedContent = document.getElementById('advancedAnalyticsContent');
+        if (advancedContent && advancedContent.classList.contains('active')) {
+            loadAdvancedAnalytics();
+        }
     });
 
-    // Load Analytics Button
-    document.getElementById('loadAnalyticsBtn')?.addEventListener('click', () => {
-        loadAdvancedAnalytics();
+    // Analytics Custom Dates - aggiorna quando cambiano le date
+    document.getElementById('analyticsStartDate')?.addEventListener('change', () => {
+        const advancedContent = document.getElementById('advancedAnalyticsContent');
+        if (advancedContent && advancedContent.classList.contains('active')) {
+            const period = document.getElementById('analyticsPeriod').value;
+            if (period === 'custom') {
+                const startDate = document.getElementById('analyticsStartDate').value;
+                const endDate = document.getElementById('analyticsEndDate').value;
+                if (startDate && endDate) {
+                    loadAdvancedAnalytics();
+                }
+            }
+        }
+    });
+
+    document.getElementById('analyticsEndDate')?.addEventListener('change', () => {
+        const advancedContent = document.getElementById('advancedAnalyticsContent');
+        if (advancedContent && advancedContent.classList.contains('active')) {
+            const period = document.getElementById('analyticsPeriod').value;
+            if (period === 'custom') {
+                const startDate = document.getElementById('analyticsStartDate').value;
+                const endDate = document.getElementById('analyticsEndDate').value;
+                if (startDate && endDate) {
+                    loadAdvancedAnalytics();
+                }
+            }
+        }
     });
 
     // Export
@@ -1070,6 +1102,102 @@ function updateOperatorSelects() {
 }
 
 // Reportistica
+// Carica i dati del report e mostra i grafici nella pagina
+async function loadReportData() {
+    const period = document.getElementById('reportPeriod').value;
+    let startDate, endDate;
+    
+    const now = new Date();
+    
+    switch(period) {
+        case 'week':
+            startDate = new Date(now);
+            startDate.setDate(startDate.getDate() - 7);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(now);
+            endDate.setHours(23, 59, 59, 999);
+            break;
+        case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+            break;
+        case 'quarter':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(now);
+            endDate.setHours(23, 59, 59, 999);
+            break;
+        case 'year':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+            break;
+        case 'custom':
+            const startInput = document.getElementById('reportStartDate').value;
+            const endInput = document.getElementById('reportEndDate').value;
+            if (!startInput || !endInput) {
+                return; // Non fare nulla se le date non sono selezionate
+            }
+            startDate = new Date(startInput);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(endInput);
+            endDate.setHours(23, 59, 59, 999);
+            break;
+        default:
+            return;
+    }
+    
+    if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return;
+    }
+    
+    try {
+        // Sincronizza il periodo delle analytics con quello del report
+        const analyticsPeriod = document.getElementById('analyticsPeriod');
+        const analyticsStartDate = document.getElementById('analyticsStartDate');
+        const analyticsEndDate = document.getElementById('analyticsEndDate');
+        
+        const periodDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+        if (periodDays <= 7) {
+            analyticsPeriod.value = '7';
+        } else if (periodDays <= 30) {
+            analyticsPeriod.value = '30';
+        } else if (periodDays <= 90) {
+            analyticsPeriod.value = '90';
+        } else if (periodDays <= 180) {
+            analyticsPeriod.value = '180';
+        } else if (periodDays <= 365) {
+            analyticsPeriod.value = '365';
+        } else {
+            analyticsPeriod.value = 'custom';
+            if (analyticsStartDate && analyticsEndDate) {
+                analyticsStartDate.value = startDate.toISOString().split('T')[0];
+                analyticsEndDate.value = endDate.toISOString().split('T')[0];
+                const customPeriod = document.getElementById('analyticsCustomPeriod');
+                if (customPeriod) {
+                    customPeriod.style.display = 'flex';
+                }
+            }
+        }
+        
+        // Assicurati che il contenuto delle analytics sia visibile
+        const advancedContent = document.getElementById('advancedAnalyticsContent');
+        if (advancedContent) {
+            advancedContent.classList.add('active');
+            // Assicurati che i canvas siano nel DOM prima di caricare i grafici
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Carica i grafici delle analytics
+        await loadAdvancedAnalytics();
+        
+    } catch (error) {
+        console.error('Errore nel caricamento dati report:', error);
+    }
+}
+
+// Genera solo il PDF del report (usa i dati già presenti)
 async function generateReport() {
     const period = document.getElementById('reportPeriod').value;
     let startDate, endDate;
@@ -1123,20 +1251,14 @@ async function generateReport() {
     }
     
     try {
-        console.log('Generazione report per periodo:', startDate, 'a', endDate);
-        
-        // Carica tutte le prenotazioni senza orderBy per evitare problemi con indici
+        // Carica i dati per il PDF
         const allBookingsSnapshot = await db.collection('bookings').get();
-        
-        // Filtra per periodo
         const bookings = allBookingsSnapshot.docs.filter(doc => {
             const booking = doc.data();
             const bookingDate = booking.dateTime?.toDate();
             if (!bookingDate) return false;
             return bookingDate >= startDate && bookingDate <= endDate;
         });
-        
-        console.log('Prenotazioni trovate:', bookings.length);
         
         const serviceNames = {
             'toelettatura-completa': 'Toelettatura Completa',
@@ -1147,7 +1269,7 @@ async function generateReport() {
         };
         
         let totalRevenue = 0;
-        let totalRevenueConfirmed = 0; // Include anche confermate
+        let totalRevenueConfirmed = 0;
         const serviceStats = {};
         const statusCounts = { pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
         
@@ -1158,10 +1280,8 @@ async function generateReport() {
             
             statusCounts[status] = (statusCounts[status] || 0) + 1;
             
-            // Fatturato solo completate
             if (status === 'completed') {
                 totalRevenue += price;
-                
                 const service = booking.service || 'unknown';
                 serviceStats[service] = {
                     count: (serviceStats[service]?.count || 0) + 1,
@@ -1169,73 +1289,13 @@ async function generateReport() {
                 };
             }
             
-            // Fatturato totale (completate + confermate)
             if (status === 'completed' || status === 'confirmed') {
                 totalRevenueConfirmed += price;
             }
         });
         
-        // Report Fatturato
-        const revenueEl = document.getElementById('revenueReport');
-        if (revenueEl) {
-            // Assicurati che il contenuto sia visibile
-            const reportsContent = document.getElementById('reportsContent');
-            if (reportsContent) {
-                reportsContent.classList.add('active');
-            }
-            
-            revenueEl.innerHTML = `
-                <div class="report-summary">
-                    <p><strong>Fatturato Completate:</strong> €${totalRevenue.toFixed(2)}</p>
-                    <p><strong>Fatturato Totale (Completate + Confermate):</strong> €${totalRevenueConfirmed.toFixed(2)}</p>
-                    <p><strong>Prenotazioni Totali:</strong> ${bookings.length}</p>
-                    <p><strong>Prenotazioni Completate:</strong> ${statusCounts.completed}</p>
-                    <p><strong>Prenotazioni Confermate:</strong> ${statusCounts.confirmed}</p>
-                    <p><strong>In Attesa:</strong> ${statusCounts.pending}</p>
-                    <p><strong>Annullate:</strong> ${statusCounts.cancelled}</p>
-                </div>
-            `;
-            console.log('Report Fatturato aggiornato');
-        } else {
-            console.error('Elemento revenueReport non trovato nel DOM');
-            alert('Errore: elemento revenueReport non trovato');
-        }
-        
-        // Report Servizi
-        const servicesEl = document.getElementById('servicesReport');
-        if (servicesEl) {
-            if (Object.keys(serviceStats).length > 0) {
-                const servicesHtml = Object.entries(serviceStats)
-                    .map(([service, stats]) => `
-                        <tr>
-                            <td>${serviceNames[service] || service}</td>
-                            <td>${stats.count}</td>
-                            <td>€${stats.revenue.toFixed(2)}</td>
-                        </tr>
-                    `).join('');
-                
-                servicesEl.innerHTML = `<table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Servizio</th>
-                            <th>Quantità</th>
-                            <th>Fatturato</th>
-                        </tr>
-                    </thead>
-                    <tbody>${servicesHtml}</tbody>
-                </table>`;
-                console.log('Report Servizi aggiornato');
-            } else {
-                servicesEl.innerHTML = '<p>Nessun servizio completato nel periodo selezionato</p>';
-                console.log('Nessun servizio completato nel periodo');
-            }
-        } else {
-            console.error('Elemento servicesReport non trovato');
-        }
-        
-        console.log('Report generato con successo');
-        console.log('Fatturato:', totalRevenue, 'Fatturato Totale:', totalRevenueConfirmed);
-        console.log('Statistiche servizi:', serviceStats);
+        // Assicurati che i grafici siano renderizzati
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Genera PDF e CSV
         await generatePDFReport(bookings, totalRevenue, totalRevenueConfirmed, statusCounts, serviceStats, serviceNames, startDate, endDate);
@@ -1379,6 +1439,64 @@ async function generatePDFReport(bookings, totalRevenue, totalRevenueConfirmed, 
                     yPos += 7;
                     rowIndex++;
                 });
+        }
+        
+        // GRAFICI ANALYTICS AVANZATE
+        yPos += 10;
+        const chartWidth = 90; // Larghezza grafici (metà pagina)
+        const chartHeight = 60; // Altezza grafici
+        
+        // Funzione helper per aggiungere un grafico al PDF
+        const addChartToPDF = (chart, title) => {
+            if (!chart) return false;
+            
+            try {
+                const imgData = chart.toBase64Image();
+                if (yPos + chartHeight > 270) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+                
+                // Titolo grafico
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...primaryColor);
+                doc.text(title, 15, yPos);
+                yPos += 8;
+                
+                // Aggiungi immagine del grafico
+                doc.addImage(imgData, 'PNG', 10, yPos, chartWidth, chartHeight);
+                yPos += chartHeight + 10;
+                return true;
+            } catch (error) {
+                console.error(`Errore nel convertire grafico ${title}:`, error);
+                return false;
+            }
+        };
+        
+        // Aggiungi tutti i grafici
+        if (analyticsCharts.revenueTrend) {
+            addChartToPDF(analyticsCharts.revenueTrend, 'Trend Fatturato');
+        }
+        
+        if (analyticsCharts.servicePerformance) {
+            addChartToPDF(analyticsCharts.servicePerformance, 'Performance Servizi');
+        }
+        
+        if (analyticsCharts.hourlyHeatmap) {
+            if (yPos + chartHeight > 270) {
+                doc.addPage();
+                yPos = 20;
+            }
+            addChartToPDF(analyticsCharts.hourlyHeatmap, 'Heatmap Orari');
+        }
+        
+        if (analyticsCharts.seasonality) {
+            addChartToPDF(analyticsCharts.seasonality, 'Analisi Stagionalità');
+        }
+        
+        if (analyticsCharts.predictions) {
+            addChartToPDF(analyticsCharts.predictions, 'Previsioni Prenotazioni');
         }
         
         // DETTAGLIO VENDITE
@@ -2031,6 +2149,23 @@ async function loadAdvancedAnalytics() {
             });
         
         if (bookings.length === 0) {
+            // Distruggi tutti i grafici esistenti
+            Object.keys(analyticsCharts).forEach(key => {
+                if (analyticsCharts[key]) {
+                    analyticsCharts[key].destroy();
+                    analyticsCharts[key] = null;
+                }
+            });
+            // Pulisci le metriche
+            document.getElementById('prediction7days').textContent = '-';
+            document.getElementById('prediction30days').textContent = '-';
+            document.getElementById('predictionRevenue').textContent = '-';
+            document.getElementById('avgDailyRevenue').textContent = '€0.00';
+            document.getElementById('avgDailyBookings').textContent = '0';
+            document.getElementById('avgTicket').textContent = '€0.00';
+            document.getElementById('completionRate').textContent = '0%';
+            document.getElementById('busiestDay').textContent = '-';
+            document.getElementById('peakHour').textContent = '-';
             alert('Nessun dato disponibile per il periodo selezionato');
             return;
         }
@@ -2086,10 +2221,13 @@ function generateRevenueTrendChart(bookings, startDate, endDate) {
         labels.push(date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }));
     }
     
+    const now = new Date();
     bookings.forEach(booking => {
-        if (booking.status === 'completed' && booking.price) {
-            const date = booking.dateTime?.toDate();
-            if (date) {
+        const date = booking.dateTime?.toDate();
+        if (date && booking.price) {
+            // Includi prenotazioni completate o con data passata
+            const isPastDate = date < now;
+            if (booking.status === 'completed' || isPastDate) {
                 const dateKey = date.toISOString().split('T')[0];
                 if (daysMap[dateKey] !== undefined) {
                     daysMap[dateKey] += booking.price || 0;
@@ -2161,15 +2299,21 @@ function generateServicePerformanceChart(bookings) {
     };
     
     const serviceStats = {};
+    const now = new Date();
     
     bookings.forEach(booking => {
-        if (booking.status === 'completed') {
-            const service = booking.service || 'unknown';
-            if (!serviceStats[service]) {
-                serviceStats[service] = { count: 0, revenue: 0 };
+        const date = booking.dateTime?.toDate();
+        if (date) {
+            // Includi prenotazioni completate o con data passata
+            const isPastDate = date < now;
+            if (booking.status === 'completed' || isPastDate) {
+                const service = booking.service || 'unknown';
+                if (!serviceStats[service]) {
+                    serviceStats[service] = { count: 0, revenue: 0 };
+                }
+                serviceStats[service].count++;
+                serviceStats[service].revenue += booking.price || 0;
             }
-            serviceStats[service].count++;
-            serviceStats[service].revenue += booking.price || 0;
         }
     });
     
@@ -2337,13 +2481,16 @@ function generateSeasonalityChart(bookings) {
     const months = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
     const monthData = Array(12).fill(0);
     const monthRevenue = Array(12).fill(0);
+    const now = new Date();
     
     bookings.forEach(booking => {
         const date = booking.dateTime?.toDate();
         if (date) {
             const month = date.getMonth();
             monthData[month]++;
-            if (booking.status === 'completed') {
+            // Includi prenotazioni completate o con data passata
+            const isPastDate = date < now;
+            if (booking.status === 'completed' || isPastDate) {
                 monthRevenue[month] += booking.price || 0;
             }
         }
@@ -2413,7 +2560,14 @@ function generateSeasonalityChart(bookings) {
 // Predictions
 function generatePredictions(bookings) {
     // Simple moving average prediction
-    const completedBookings = bookings.filter(b => b.status === 'completed');
+    // Includi prenotazioni completate o con data passata
+    const now = new Date();
+    const completedBookings = bookings.filter(b => {
+        const date = b.dateTime?.toDate();
+        if (!date) return false;
+        const isPastDate = date < now;
+        return b.status === 'completed' || isPastDate;
+    });
     
     // Calculate average bookings per day
     const bookingDates = completedBookings.map(b => b.dateTime?.toDate()).filter(d => d);
@@ -2456,7 +2610,6 @@ function generatePredictions(bookings) {
     }
     
     // Last 7 days actual vs next 7 days predicted
-    const now = new Date();
     const last7Days = [];
     const next7Days = [];
     
@@ -2534,8 +2687,20 @@ function generatePredictions(bookings) {
 
 // Calculate Key Metrics
 function calculateKeyMetrics(bookings, prevBookings) {
-    const completed = bookings.filter(b => b.status === 'completed');
-    const prevCompleted = prevBookings.filter(b => b.status === 'completed');
+    const now = new Date();
+    // Includi prenotazioni completate o con data passata
+    const completed = bookings.filter(b => {
+        const date = b.dateTime?.toDate();
+        if (!date) return false;
+        const isPastDate = date < now;
+        return b.status === 'completed' || isPastDate;
+    });
+    const prevCompleted = prevBookings.filter(b => {
+        const date = b.dateTime?.toDate();
+        if (!date) return false;
+        const isPastDate = date < now;
+        return b.status === 'completed' || isPastDate;
+    });
     
     // Average Daily Revenue
     const bookingDates = bookings.map(b => b.dateTime?.toDate()).filter(d => d);

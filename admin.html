@@ -208,27 +208,9 @@
                     <button id="generateReportBtn" class="btn btn-primary">Genera Report</button>
                 </div>
             </div>
-            
-            <!-- Analytics Tab Navigation -->
-            <div class="analytics-tabs">
-                <button class="analytics-tab-btn active" data-analytics="reports">Report Base</button>
-                <button class="analytics-tab-btn" data-analytics="advanced">Analytics Avanzate</button>
-            </div>
-
-            <!-- Reports Content -->
-            <div id="reportsContent" class="reports-content analytics-content active">
-                <div class="report-section">
-                    <h4>Fatturato</h4>
-                    <div id="revenueReport"></div>
-                </div>
-                <div class="report-section">
-                    <h4>Statistiche Servizi</h4>
-                    <div id="servicesReport"></div>
-                </div>
-            </div>
 
             <!-- Advanced Analytics Content -->
-            <div id="advancedAnalyticsContent" class="analytics-content">
+            <div id="advancedAnalyticsContent" class="analytics-content active">
                 <div class="analytics-filters">
                     <select id="analyticsPeriod" class="filter-select">
                         <option value="7">Ultimi 7 giorni</option>
@@ -243,7 +225,6 @@
                         <span>a</span>
                         <input type="date" id="analyticsEndDate" class="filter-input">
                     </div>
-                    <button id="loadAnalyticsBtn" class="btn btn-primary">Carica Analytics</button>
                 </div>
 
                 <!-- Revenue Trend Chart -->
