@@ -1,5 +1,4 @@
 # File di configurazione sensibili
-firebase-config.js
 *.env
 .env.local
 .env.*.local
