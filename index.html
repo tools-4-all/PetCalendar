@@ -32,7 +32,28 @@
                     <input type="email" id="email" placeholder="Email aziendale" required>
                     <input type="password" id="password" placeholder="Password" required>
                     <button type="submit" class="btn btn-primary">Accedi</button>
-                    <button type="button" id="registerBtn" class="btn btn-secondary">Registra la tua Azienda</button>
+                    <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem;">
+                        Non hai un account? <a href="#" id="switchToRegister" style="color: var(--primary-color); text-decoration: underline; cursor: pointer;">Registra la tua Azienda</a>
+                    </p>
+                </form>
+            </div>
+        </div>
+
+        <!-- Register Modal -->
+        <div id="registerModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Registra la tua Azienda</h2>
+                <p style="color: var(--dark-color); margin-bottom: 1rem; font-size: 0.9rem;">
+                    Crea un account per la tua azienda di toelettatura
+                </p>
+                <form id="registerForm">
+                    <input type="email" id="registerEmail" placeholder="Email aziendale" required>
+                    <input type="password" id="registerPassword" placeholder="Password (min. 6 caratteri)" required>
+                    <button type="submit" class="btn btn-primary">Registra</button>
+                    <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem;">
+                        Hai già un account? <a href="#" id="switchToLogin" style="color: var(--primary-color); text-decoration: underline; cursor: pointer;">Accedi</a>
+                    </p>
                 </form>
             </div>
         </div>
@@ -209,14 +230,18 @@
                         await user.reload();
                         console.log('Utente ricaricato, email verificata:', user.emailVerified);
                         
-                        // Per ora permettere l'accesso anche senza verifica email (per sviluppo)
-                        // TODO: Riattivare verifica email in produzione
+                        // Verifica che l'email sia stata verificata
+                        if (!user.emailVerified) {
+                            console.warn('Email non verificata, disconnessione utente');
+                            await auth.signOut();
+                            currentUser = null;
+                            updateUIForLoggedOut();
+                            alert('Per favore, verifica la tua email prima di accedere. Controlla la tua casella di posta e clicca sul link di verifica.');
+                            return;
+                        }
+                        
                         currentUser = user;
                         updateUIForLoggedIn();
-                        
-                        if (!user.emailVerified) {
-                            console.warn('Email non verificata, ma accesso permesso per sviluppo');
-                        }
                         
                         // Reindirizza alla dashboard se già loggato
                         console.log('Reindirizzamento a admin.html...');
@@ -253,11 +278,12 @@
             }
 
             const loginModal = document.getElementById('loginModal');
+            const registerModal = document.getElementById('registerModal');
             const logoutBtn = document.getElementById('logoutBtn');
             const authForm = document.getElementById('authForm');
-            const registerBtn = document.getElementById('registerBtn');
+            const registerForm = document.getElementById('registerForm');
 
-            if (!loginModal || !authForm || !registerBtn) {
+            if (!loginModal || !registerModal || !authForm || !registerForm) {
                 console.error('Elementi DOM non trovati');
                 return;
             }
@@ -290,17 +316,26 @@
                     
                     await user.reload();
                     
-                    // Per ora permettere l'accesso anche senza verifica email (per sviluppo)
-                    // TODO: Riattivare verifica email in produzione
+                    // Verifica se l'email è stata verificata
                     if (!user.emailVerified) {
-                        console.warn('Email non verificata, ma accesso permesso');
-                        // Opzionale: invia email di verifica in background
-                        try {
-                            await user.sendEmailVerification();
-                            console.log('Email di verifica inviata');
-                        } catch (verificationError) {
-                            console.warn('Errore nell\'invio email di verifica:', verificationError);
+                        // Disconnetti l'utente se l'email non è verificata
+                        await auth.signOut();
+                        
+                        const resend = confirm('La tua email non è stata ancora verificata. Devi verificare l\'email prima di accedere. Vuoi ricevere nuovamente l\'email di verifica?');
+                        if (resend) {
+                            try {
+                                await user.sendEmailVerification();
+                                alert('Email di verifica inviata! Controlla la tua casella di posta e clicca sul link di verifica prima di accedere nuovamente.');
+                            } catch (verificationError) {
+                                console.error('Errore nell\'invio email di verifica:', verificationError);
+                                alert('Errore nell\'invio dell\'email di verifica: ' + verificationError.message);
+                            }
+                        } else {
+                            alert('Per favore, verifica la tua email prima di accedere. Controlla la tua casella di posta.');
                         }
+                        loginModal.classList.remove('show');
+                        authForm.reset();
+                        return;
                     }
                     
                     loginModal.classList.remove('show');
@@ -327,9 +362,11 @@
                 }
             });
 
-            registerBtn.addEventListener('click', async () => {
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
+            // Form di registrazione
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('registerEmail').value;
+                const password = document.getElementById('registerPassword').value;
 
                 if (!email || !password) {
                     alert('Inserisci email e password');
@@ -345,6 +382,7 @@
                     const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                     const user = userCredential.user;
                     
+                    // Invia email di verifica
                     try {
                         await user.sendEmailVerification();
                         alert('Registrazione completata! Controlla la tua email per verificare l\'account. Dovrai effettuare il login dopo aver verificato l\'email.');
@@ -353,12 +391,13 @@
                         alert('Registrazione completata, ma non è stato possibile inviare l\'email di verifica. Puoi richiederla più tardi dalle impostazioni.');
                     }
                     
+                    // Disconnetti l'utente se l'email non è verificata
                     if (!user.emailVerified) {
                         await auth.signOut();
                     }
                     
-                    loginModal.classList.remove('show');
-                    document.getElementById('authForm').reset();
+                    registerModal.classList.remove('show');
+                    registerForm.reset();
                 } catch (error) {
                     console.error('Errore durante la registrazione:', error);
                     let errorMessage = 'Errore durante la registrazione';
@@ -413,10 +452,50 @@
 
             if (heroRegisterBtn) {
                 heroRegisterBtn.addEventListener('click', () => {
-                    const loginModal = document.getElementById('loginModal');
-                    if (loginModal) {
-                        loginModal.classList.add('show');
+                    const registerModal = document.getElementById('registerModal');
+                    if (registerModal) {
+                        registerModal.classList.add('show');
                         // Focus sul form
+                        setTimeout(() => {
+                            const emailInput = document.getElementById('registerEmail');
+                            if (emailInput) {
+                                emailInput.focus();
+                            }
+                        }, 300);
+                    }
+                });
+            }
+
+            // Switch tra login e registrazione
+            const switchToRegister = document.getElementById('switchToRegister');
+            const switchToLogin = document.getElementById('switchToLogin');
+            
+            if (switchToRegister) {
+                switchToRegister.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const loginModal = document.getElementById('loginModal');
+                    const registerModal = document.getElementById('registerModal');
+                    if (loginModal && registerModal) {
+                        loginModal.classList.remove('show');
+                        registerModal.classList.add('show');
+                        setTimeout(() => {
+                            const emailInput = document.getElementById('registerEmail');
+                            if (emailInput) {
+                                emailInput.focus();
+                            }
+                        }, 300);
+                    }
+                });
+            }
+
+            if (switchToLogin) {
+                switchToLogin.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const loginModal = document.getElementById('loginModal');
+                    const registerModal = document.getElementById('registerModal');
+                    if (loginModal && registerModal) {
+                        registerModal.classList.remove('show');
+                        loginModal.classList.add('show');
                         setTimeout(() => {
                             const emailInput = document.getElementById('email');
                             if (emailInput) {
