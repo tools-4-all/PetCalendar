@@ -31,6 +31,9 @@
                 <form id="authForm">
                     <input type="email" id="email" placeholder="Email aziendale" required>
                     <input type="password" id="password" placeholder="Password" required>
+                    <div style="text-align: right; margin-top: 0.5rem; margin-bottom: 1rem;">
+                        <a href="#" id="forgotPasswordLink" style="color: var(--primary-color); text-decoration: underline; cursor: pointer; font-size: 0.9rem;">Password dimenticata?</a>
+                    </div>
                     <button type="submit" class="btn btn-primary">Accedi</button>
                     <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem;">
                         Non hai un account? <a href="#" id="switchToRegister" style="color: var(--primary-color); text-decoration: underline; cursor: pointer;">Registra la tua Azienda</a>
@@ -53,6 +56,25 @@
                     <button type="submit" class="btn btn-primary">Registra</button>
                     <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem;">
                         Hai già un account? <a href="#" id="switchToLogin" style="color: var(--primary-color); text-decoration: underline; cursor: pointer;">Accedi</a>
+                    </p>
+                </form>
+            </div>
+        </div>
+
+        <!-- Forgot Password Modal -->
+        <div id="forgotPasswordModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Recupera Password</h2>
+                <p style="color: var(--dark-color); margin-bottom: 1rem; font-size: 0.9rem;">
+                    Inserisci la tua email e ti invieremo un link per reimpostare la password.
+                </p>
+                <form id="forgotPasswordForm">
+                    <input type="email" id="forgotPasswordEmail" placeholder="Email aziendale" required>
+                    <button type="submit" class="btn btn-primary">Invia Link di Recupero</button>
+                    <div id="forgotPasswordMessage" style="display: none; margin-top: 1rem; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem;"></div>
+                    <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem;">
+                        <a href="#" id="backToLogin" style="color: var(--primary-color); text-decoration: underline; cursor: pointer;">Torna al login</a>
                     </p>
                 </form>
             </div>
@@ -279,11 +301,13 @@
 
             const loginModal = document.getElementById('loginModal');
             const registerModal = document.getElementById('registerModal');
+            const forgotPasswordModal = document.getElementById('forgotPasswordModal');
             const logoutBtn = document.getElementById('logoutBtn');
             const authForm = document.getElementById('authForm');
             const registerForm = document.getElementById('registerForm');
+            const forgotPasswordForm = document.getElementById('forgotPasswordForm');
 
-            if (!loginModal || !registerModal || !authForm || !registerForm) {
+            if (!loginModal || !registerModal || !forgotPasswordModal || !authForm || !registerForm || !forgotPasswordForm) {
                 console.error('Elementi DOM non trovati');
                 return;
             }
@@ -348,17 +372,65 @@
                     
                     if (error.code === 'auth/user-not-found') {
                         errorMessage = 'Utente non trovato. Verifica l\'email o registrati.';
-                    } else if (error.code === 'auth/wrong-password') {
-                        errorMessage = 'Password errata. Riprova.';
+                    } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                        errorMessage = 'Email o password non corretti. Controlla le credenziali e riprova.';
+                    } else if (error.code === 'auth/invalid-email') {
+                        errorMessage = 'Email non valida.';
+                    } else if (error.code === 'auth/too-many-requests') {
+                        errorMessage = 'Troppi tentativi di accesso falliti. Riprova più tardi o recupera la password.';
+                    } else if (error.message) {
+                        // Rimuove il prefisso tecnico di Firebase se presente
+                        errorMessage = error.message.replace(/^Firebase:\s*/i, '').replace(/\s*\(auth\/[^)]+\)\.?$/i, '');
+                        // Se il messaggio è ancora troppo tecnico, usa un messaggio generico
+                        if (errorMessage.includes('auth/') || errorMessage.includes('credential')) {
+                            errorMessage = 'Email o password non corretti. Controlla le credenziali e riprova.';
+                        }
+                    }
+                    
+                    alert(errorMessage);
+                }
+            });
+
+            // Form reset password
+            forgotPasswordForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('forgotPasswordEmail').value;
+                const messageDiv = document.getElementById('forgotPasswordMessage');
+
+                if (!email) {
+                    messageDiv.textContent = 'Inserisci la tua email.';
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.background = '#fee';
+                    messageDiv.style.color = '#c33';
+                    messageDiv.style.borderLeft = '4px solid var(--danger-color)';
+                    return;
+                }
+
+                try {
+                    await auth.sendPasswordResetEmail(email);
+                    messageDiv.textContent = 'Email di recupero password inviata! Controlla la tua casella di posta e segui le istruzioni per reimpostare la password.';
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.background = '#d1fae5';
+                    messageDiv.style.color = '#065f46';
+                    messageDiv.style.borderLeft = '4px solid var(--success-color)';
+                    forgotPasswordForm.reset();
+                } catch (error) {
+                    console.error('Errore durante l\'invio email di reset:', error);
+                    let errorMessage = 'Errore nell\'invio dell\'email di recupero.';
+                    
+                    if (error.code === 'auth/user-not-found') {
+                        errorMessage = 'Nessun account trovato con questa email. Verifica l\'indirizzo email.';
                     } else if (error.code === 'auth/invalid-email') {
                         errorMessage = 'Email non valida.';
                     } else if (error.code === 'auth/too-many-requests') {
                         errorMessage = 'Troppi tentativi. Riprova più tardi.';
-                    } else if (error.message) {
-                        errorMessage = error.message;
                     }
                     
-                    alert(errorMessage);
+                    messageDiv.textContent = errorMessage;
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.background = '#fee';
+                    messageDiv.style.color = '#c33';
+                    messageDiv.style.borderLeft = '4px solid var(--danger-color)';
                 }
             });
 
@@ -425,7 +497,16 @@
 
             closeBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
-                    btn.closest('.modal').classList.remove('show');
+                    const modal = btn.closest('.modal');
+                    modal.classList.remove('show');
+                    // Reset del form password dimenticata se chiuso
+                    if (modal.id === 'forgotPasswordModal') {
+                        const messageDiv = document.getElementById('forgotPasswordMessage');
+                        if (messageDiv) {
+                            messageDiv.style.display = 'none';
+                        }
+                        forgotPasswordForm.reset();
+                    }
                 });
             });
 
@@ -433,6 +514,14 @@
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) {
                         modal.classList.remove('show');
+                        // Reset del form password dimenticata se chiuso
+                        if (modal.id === 'forgotPasswordModal') {
+                            const messageDiv = document.getElementById('forgotPasswordMessage');
+                            if (messageDiv) {
+                                messageDiv.style.display = 'none';
+                            }
+                            forgotPasswordForm.reset();
+                        }
                     }
                 });
             });
@@ -463,6 +552,43 @@
                             }
                         }, 300);
                     }
+                });
+            }
+
+            // Link password dimenticata
+            const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+            if (forgotPasswordLink) {
+                forgotPasswordLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('email').value;
+                    loginModal.classList.remove('show');
+                    forgotPasswordModal.classList.add('show');
+                    // Pre-compila l'email se già inserita nel form di login
+                    if (email) {
+                        document.getElementById('forgotPasswordEmail').value = email;
+                    }
+                    setTimeout(() => {
+                        const emailInput = document.getElementById('forgotPasswordEmail');
+                        if (emailInput) {
+                            emailInput.focus();
+                        }
+                    }, 300);
+                });
+            }
+
+            // Torna al login dal modal password dimenticata
+            const backToLogin = document.getElementById('backToLogin');
+            if (backToLogin) {
+                backToLogin.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    forgotPasswordModal.classList.remove('show');
+                    loginModal.classList.add('show');
+                    // Reset del messaggio
+                    const messageDiv = document.getElementById('forgotPasswordMessage');
+                    if (messageDiv) {
+                        messageDiv.style.display = 'none';
+                    }
+                    forgotPasswordForm.reset();
                 });
             }
 

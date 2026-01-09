@@ -1416,6 +1416,66 @@ body {
     font-size: 0.85rem;
 }
 
+.password-change-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.password-change-container input {
+    width: 100%;
+}
+
+.password-strength {
+    padding: 0.5rem;
+    border-radius: var(--border-radius);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.password-strength.weak {
+    background: #fee;
+    color: #c33;
+    border-left: 4px solid var(--danger-color);
+}
+
+.password-strength.medium {
+    background: #fff3cd;
+    color: #856404;
+    border-left: 4px solid var(--warning-color);
+}
+
+.password-strength.strong {
+    background: #d1fae5;
+    color: #065f46;
+    border-left: 4px solid var(--success-color);
+}
+
+.password-message {
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius);
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.password-message.success {
+    background: #d1fae5;
+    color: #065f46;
+    border-left: 4px solid var(--success-color);
+}
+
+.password-message.error {
+    background: #fee;
+    color: #c33;
+    border-left: 4px solid var(--danger-color);
+}
+
+.password-message.info {
+    background: #e0f2fe;
+    color: #0c4a6e;
+    border-left: 4px solid var(--primary-color);
+}
+
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;

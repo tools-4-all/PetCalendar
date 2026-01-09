@@ -446,6 +446,25 @@ function initEventListeners() {
         await changePassword();
     });
 
+    // Password strength checker
+    const newPasswordInput = document.getElementById('newPassword');
+    if (newPasswordInput) {
+        newPasswordInput.addEventListener('input', (e) => {
+            checkPasswordStrength(e.target.value);
+        });
+    }
+
+    // Clear password strength when password is cleared
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    if (confirmPasswordInput) {
+        confirmPasswordInput.addEventListener('input', () => {
+            const newPassword = document.getElementById('newPassword').value;
+            if (!newPassword) {
+                hidePasswordStrength();
+            }
+        });
+    }
+
     document.getElementById('upgradePlanBtn')?.addEventListener('click', () => {
         document.querySelector('.plans-grid')?.scrollIntoView({ behavior: 'smooth' });
     });
@@ -2684,43 +2703,146 @@ async function saveCompanyProfile() {
 }
 
 async function changePassword() {
-    if (!currentUser) return;
+    if (!currentUser) {
+        showPasswordMessage('Devi essere autenticato per cambiare la password.', 'error');
+        return;
+    }
 
+    const currentPassword = document.getElementById('currentPassword').value;
     const newPassword = document.getElementById('newPassword').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
 
-    if (!newPassword || !confirmPassword) {
-        alert('Inserisci la nuova password e confermala');
+    // Reset messages
+    hidePasswordMessage();
+    hidePasswordStrength();
+
+    // Validazione
+    if (!currentPassword) {
+        showPasswordMessage('Inserisci la password attuale.', 'error');
+        document.getElementById('currentPassword').focus();
+        return;
+    }
+
+    if (!newPassword) {
+        showPasswordMessage('Inserisci la nuova password.', 'error');
+        document.getElementById('newPassword').focus();
         return;
     }
 
     if (newPassword.length < 6) {
-        alert('La password deve essere di almeno 6 caratteri');
+        showPasswordMessage('La password deve essere di almeno 6 caratteri.', 'error');
+        document.getElementById('newPassword').focus();
         return;
     }
 
     if (newPassword !== confirmPassword) {
-        alert('Le password non corrispondono');
+        showPasswordMessage('Le password non corrispondono. Controlla la conferma password.', 'error');
+        document.getElementById('confirmPassword').focus();
         return;
     }
 
+    if (currentPassword === newPassword) {
+        showPasswordMessage('La nuova password deve essere diversa dalla password attuale.', 'error');
+        document.getElementById('newPassword').focus();
+        return;
+    }
+
+    // Disabilita il bottone durante l'operazione
+    const changeBtn = document.getElementById('changePasswordBtn');
+    const originalText = changeBtn.textContent;
+    changeBtn.disabled = true;
+    changeBtn.textContent = 'Cambio password in corso...';
+
     try {
+        // Re-autenticazione con la password corrente
+        const email = currentUser.email;
+        const credential = firebase.auth.EmailAuthProvider.credential(email, currentPassword);
+        await currentUser.reauthenticateWithCredential(credential);
+
+        // Aggiorna la password
         await currentUser.updatePassword(newPassword);
-        alert('Password cambiata con successo!');
+        
+        // Successo
+        showPasswordMessage('Password cambiata con successo!', 'success');
+        
+        // Reset form
+        document.getElementById('currentPassword').value = '';
         document.getElementById('newPassword').value = '';
         document.getElementById('confirmPassword').value = '';
+        hidePasswordStrength();
+
+        // Scroll per mostrare il messaggio
+        document.getElementById('passwordMessage').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
     } catch (error) {
         console.error('Errore nel cambio password:', error);
-        let errorMessage = 'Errore nel cambio password';
+        let errorMessage = 'Errore nel cambio password.';
         
-        if (error.code === 'auth/requires-recent-login') {
+        if (error.code === 'auth/wrong-password') {
+            errorMessage = 'Password attuale errata. Controlla e riprova.';
+        } else if (error.code === 'auth/requires-recent-login') {
             errorMessage = 'Per sicurezza, effettua nuovamente il login prima di cambiare la password.';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'La password è troppo debole. Scegli una password più sicura.';
         } else if (error.message) {
             errorMessage = error.message;
         }
         
-        alert(errorMessage);
+        showPasswordMessage(errorMessage, 'error');
+        document.getElementById('currentPassword').focus();
+    } finally {
+        // Riabilita il bottone
+        changeBtn.disabled = false;
+        changeBtn.textContent = originalText;
     }
+}
+
+function checkPasswordStrength(password) {
+    if (!password) {
+        hidePasswordStrength();
+        return;
+    }
+
+    const strengthDiv = document.getElementById('passwordStrength');
+    let strength = 0;
+    let message = '';
+
+    if (password.length >= 6) strength++;
+    if (password.length >= 8) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/\d/.test(password)) strength++;
+    if (/[^a-zA-Z\d]/.test(password)) strength++;
+
+    if (strength <= 2) {
+        strengthDiv.className = 'password-strength weak';
+        message = 'Password debole';
+    } else if (strength <= 3) {
+        strengthDiv.className = 'password-strength medium';
+        message = 'Password media';
+    } else {
+        strengthDiv.className = 'password-strength strong';
+        message = 'Password forte';
+    }
+
+    strengthDiv.textContent = message;
+    strengthDiv.style.display = 'block';
+}
+
+function showPasswordMessage(message, type) {
+    const messageDiv = document.getElementById('passwordMessage');
+    messageDiv.textContent = message;
+    messageDiv.className = `password-message ${type}`;
+    messageDiv.style.display = 'block';
+}
+
+function hidePasswordMessage() {
+    const messageDiv = document.getElementById('passwordMessage');
+    messageDiv.style.display = 'none';
+}
+
+function hidePasswordStrength() {
+    const strengthDiv = document.getElementById('passwordStrength');
+    strengthDiv.style.display = 'none';
 }
 
 async function handlePlanChange(plan) {
