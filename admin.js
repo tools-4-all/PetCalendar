@@ -145,8 +145,12 @@ function initCalendar() {
     // Renderizza solo se l'elemento è visibile
     const calendarTab = document.getElementById('calendarTab');
     if (calendarTab && calendarTab.classList.contains('active')) {
-        adminCalendar.render();
-        loadCalendarEvents();
+        // Aspetta un po' per assicurarsi che l'elemento sia completamente visibile
+        setTimeout(() => {
+            adminCalendar.render();
+            adminCalendar.updateSize();
+            loadCalendarEvents();
+        }, 100);
     }
 }
 
@@ -210,13 +214,16 @@ function initTabs() {
                             // Se il calendario esiste già, aggiorna la vista
                             adminCalendar.render();
                             adminCalendar.updateSize();
+                            // Ricarica gli eventi
                             loadCalendarEvents();
                         } else {
                             // Altrimenti inizializzalo
                             initCalendar();
                         }
+                    } else {
+                        console.error('Elemento calendario non trovato nel tab calendar');
                     }
-                }, 150);
+                }, 200);
             }
             
             // Carica dati specifici per tab
@@ -506,7 +513,12 @@ function initEventListeners() {
 async function loadAdminData() {
     if (!currentUser) return;
     
-    loadCalendarEvents();
+    // Carica eventi calendario solo se il calendario è inizializzato
+    // Se non è inizializzato, verrà caricato quando si apre il tab calendar
+    if (adminCalendar) {
+        loadCalendarEvents();
+    }
+    
     loadDayBookings();
     loadStats();
     loadAdvancedStats();
@@ -517,9 +529,13 @@ function loadCalendarEvents() {
     // Disconnetti il listener precedente se esiste
     if (adminCalendarUnsubscribe) {
         adminCalendarUnsubscribe();
+        adminCalendarUnsubscribe = null;
     }
 
-    if (!adminCalendar) return;
+    if (!adminCalendar) {
+        console.warn('loadCalendarEvents: calendario non inizializzato');
+        return;
+    }
 
     try {
         if (!currentUser) {
@@ -527,50 +543,104 @@ function loadCalendarEvents() {
             return;
         }
         
-        // Query base - per retrocompatibilità, filtriamo lato client
-        // (le prenotazioni vecchie potrebbero non avere companyId)
+        console.log('loadCalendarEvents: caricamento eventi per companyId:', currentUser.uid);
+        
+        // Usa una query semplice che carica tutte le prenotazioni e filtra lato client
+        // Questo evita problemi con indici composti mancanti
         let query = db.collection('bookings');
         
-        // Applica filtri
+        // Applica solo il filtro status se presente (più semplice)
         if (currentFilters.status) {
             query = query.where('status', '==', currentFilters.status);
         } else {
-            query = query.where('status', 'in', ['pending', 'confirmed']);
-        }
-        
-        if (currentFilters.service) {
-            query = query.where('service', '==', currentFilters.service);
+            // Carica tutte le prenotazioni e filtriamo lato client per status
+            query = query.where('status', 'in', ['pending', 'confirmed', 'cancelled']);
         }
         
         // Sincronizzazione in tempo reale
         adminCalendarUnsubscribe = query
             .orderBy('dateTime', 'asc')
             .onSnapshot((snapshot) => {
+                console.log('loadCalendarEvents: ricevute', snapshot.size, 'prenotazioni totali dal database');
                 const events = [];
+                let skippedCount = 0;
+                
                 snapshot.forEach(doc => {
                     const booking = doc.data();
                     
-                    // Filtra per companyId lato client (per retrocompatibilità)
-                    if (booking.companyId && booking.companyId !== currentUser.uid) {
-                        return; // Salta prenotazioni di altre aziende
+                    // Filtra per companyId lato client
+                    // Se ha companyId, deve corrispondere all'azienda corrente
+                    if (booking.companyId) {
+                        if (booking.companyId !== currentUser.uid) {
+                            skippedCount++;
+                            return; // Salta prenotazioni di altre aziende
+                        }
+                    } else {
+                        // Se non ha companyId, potrebbe essere una prenotazione vecchia
+                        // Per sicurezza, la includiamo solo se non ha companyId (retrocompatibilità)
+                        console.log('Prenotazione senza companyId trovata:', doc.id, booking);
                     }
-                    // Se non ha companyId, includiamo la prenotazione (retrocompatibilità)
                     
-                    // Filtro operatore (se implementato)
+                    // Filtro status lato client (se non già filtrato)
+                    if (!currentFilters.status) {
+                        if (!['pending', 'confirmed'].includes(booking.status)) {
+                            skippedCount++;
+                            return;
+                        }
+                    }
+                    
+                    // Filtro servizio lato client
+                    if (currentFilters.service && booking.service !== currentFilters.service) {
+                        skippedCount++;
+                        return;
+                    }
+                    
+                    // Filtro operatore lato client
                     if (currentFilters.operator && booking.operatorId !== currentFilters.operator) {
+                        skippedCount++;
+                        return;
+                    }
+                    
+                    // Verifica che dateTime esista e sia valido
+                    if (!booking.dateTime) {
+                        console.warn('Prenotazione senza dateTime:', doc.id);
+                        skippedCount++;
                         return;
                     }
                     
                     const date = timestampToDate(booking.dateTime);
+                    if (!date || isNaN(date.getTime())) {
+                        console.warn('Data non valida per prenotazione:', doc.id, booking.dateTime);
+                        skippedCount++;
+                        return;
+                    }
+                    
+                    // Verifica che animalName esista
+                    if (!booking.animalName) {
+                        console.warn('Prenotazione senza animalName:', doc.id);
+                    }
                     
                     let color = '#f39c12'; // pending
                     if (booking.status === 'confirmed') {
                         color = '#4a90e2';
+                    } else if (booking.status === 'cancelled') {
+                        color = '#e74c3c';
                     }
+                    
+                    // Crea titolo evento
+                    const serviceNames = {
+                        'toelettatura-completa': 'Toelettatura',
+                        'bagno': 'Bagno',
+                        'taglio-unghie': 'Taglio Unghie',
+                        'pulizia-orecchie': 'Pulizia Orecchie',
+                        'taglio-pelo': 'Taglio Pelo'
+                    };
+                    const serviceName = serviceNames[booking.service] || booking.service || 'Servizio';
+                    const title = `${booking.animalName || 'N/A'} - ${serviceName}`;
                     
                     events.push({
                         id: doc.id,
-                        title: `${booking.animalName} - ${booking.service}`,
+                        title: title,
                         start: date.toISOString(),
                         backgroundColor: color,
                         extendedProps: {
@@ -579,43 +649,112 @@ function loadCalendarEvents() {
                     });
                 });
 
-                adminCalendar.removeAllEvents();
-                adminCalendar.addEventSource(events);
+                console.log('loadCalendarEvents: filtrate', skippedCount, 'prenotazioni, aggiungendo', events.length, 'eventi al calendario');
+                
+                // Rimuovi tutti gli eventi esistenti
+                try {
+                    adminCalendar.removeAllEvents();
+                } catch (removeError) {
+                    console.warn('Errore nella rimozione eventi:', removeError);
+                }
+                
+                // Aggiungi i nuovi eventi
+                if (events.length > 0) {
+                    console.log('loadCalendarEvents: eventi da aggiungere:', events.map(e => ({ id: e.id, title: e.title, start: e.start })));
+                    try {
+                        // Aggiungi eventi uno per uno per debug
+                        events.forEach(event => {
+                            try {
+                                adminCalendar.addEvent(event);
+                            } catch (addError) {
+                                console.error('Errore nell\'aggiunta evento:', event, addError);
+                            }
+                        });
+                        console.log('loadCalendarEvents: eventi aggiunti con successo');
+                    } catch (addError) {
+                        console.error('Errore nell\'aggiunta eventi:', addError);
+                        // Prova con addEventSource come fallback
+                        try {
+                            adminCalendar.addEventSource(events);
+                        } catch (sourceError) {
+                            console.error('Errore anche con addEventSource:', sourceError);
+                        }
+                    }
+                } else {
+                    console.warn('loadCalendarEvents: nessun evento da aggiungere al calendario');
+                }
+                
+                // Forza il refresh del calendario
+                try {
+                    adminCalendar.render();
+                    console.log('loadCalendarEvents: calendario aggiornato con successo');
+                } catch (renderError) {
+                    console.error('Errore nel rendering calendario:', renderError);
+                }
             }, (error) => {
                 console.error('Errore nel listener calendario admin:', error);
-                // Se la query fallisce per mancanza di indice, prova una query alternativa
-                if (error.code === 'failed-precondition') {
-                    console.warn('Query fallita per mancanza di indice. Creando query alternativa...');
-                    // Prova una query più semplice senza alcuni filtri
+                console.error('Dettagli errore:', {
+                    code: error.code,
+                    message: error.message,
+                    stack: error.stack
+                });
+                
+                // Se la query fallisce, prova una query ancora più semplice
+                if (error.code === 'failed-precondition' || error.code === 'invalid-argument') {
+                    console.warn('Query fallita, usando query semplificata...');
                     try {
-                        const fallbackQuery = db.collection('bookings')
-                            .where('companyId', '==', currentUser.uid)
-                            .orderBy('dateTime', 'asc');
-                        
-                        adminCalendarUnsubscribe = fallbackQuery.onSnapshot((snapshot) => {
-                            const events = [];
-                            snapshot.forEach(doc => {
-                                const booking = doc.data();
-                                // Filtra lato client
-                                if (booking.companyId && booking.companyId !== currentUser.uid) return;
-                                if (currentFilters.status && booking.status !== currentFilters.status) return;
-                                if (!currentFilters.status && !['pending', 'confirmed'].includes(booking.status)) return;
-                                if (currentFilters.service && booking.service !== currentFilters.service) return;
-                                
-                                const date = timestampToDate(booking.dateTime);
-                                events.push({
-                                    id: doc.id,
-                                    title: `${booking.animalName} - ${booking.service}`,
-                                    start: date.toISOString(),
-                                    backgroundColor: booking.status === 'confirmed' ? '#4a90e2' : '#f39c12',
-                                    extendedProps: { booking: { id: doc.id, ...booking } }
+                        // Query semplificata: carica tutto e filtra completamente lato client
+                        adminCalendarUnsubscribe = db.collection('bookings')
+                            .onSnapshot((snapshot) => {
+                                console.log('loadCalendarEvents (query semplificata): ricevute', snapshot.size, 'prenotazioni');
+                                const events = [];
+                                snapshot.forEach(doc => {
+                                    const booking = doc.data();
+                                    
+                                    // Filtra tutto lato client
+                                    if (booking.companyId && booking.companyId !== currentUser.uid) return;
+                                    if (!currentFilters.status && !['pending', 'confirmed'].includes(booking.status)) return;
+                                    if (currentFilters.status && booking.status !== currentFilters.status) return;
+                                    if (currentFilters.service && booking.service !== currentFilters.service) return;
+                                    if (currentFilters.operator && booking.operatorId !== currentFilters.operator) return;
+                                    if (!booking.dateTime) return;
+                                    
+                                    const date = timestampToDate(booking.dateTime);
+                                    if (!date || isNaN(date.getTime())) return;
+                                    
+                                    const serviceNames = {
+                                        'toelettatura-completa': 'Toelettatura',
+                                        'bagno': 'Bagno',
+                                        'taglio-unghie': 'Taglio Unghie',
+                                        'pulizia-orecchie': 'Pulizia Orecchie',
+                                        'taglio-pelo': 'Taglio Pelo'
+                                    };
+                                    const serviceName = serviceNames[booking.service] || booking.service || 'Servizio';
+                                    const title = `${booking.animalName || 'N/A'} - ${serviceName}`;
+                                    
+                                    events.push({
+                                        id: doc.id,
+                                        title: title,
+                                        start: date.toISOString(),
+                                        backgroundColor: booking.status === 'confirmed' ? '#4a90e2' : '#f39c12',
+                                        extendedProps: { booking: { id: doc.id, ...booking } }
+                                    });
                                 });
+                                
+                                // Ordina eventi per data
+                                events.sort((a, b) => new Date(a.start) - new Date(b.start));
+                                
+                                console.log('loadCalendarEvents (query semplificata): aggiungendo', events.length, 'eventi al calendario');
+                                adminCalendar.removeAllEvents();
+                                if (events.length > 0) {
+                                    adminCalendar.addEventSource(events);
+                                }
+                                adminCalendar.render();
+                            }, (simpleError) => {
+                                console.error('Anche la query semplificata è fallita:', simpleError);
                             });
-                            adminCalendar.removeAllEvents();
-                            adminCalendar.addEventSource(events);
-                        });
-                    } catch (fallbackError) {
-                        console.error('Anche la query alternativa è fallita:', fallbackError);
+                    } catch (simpleError) {
+                        console.error('Errore nella query semplificata:', simpleError);
                     }
                 }
             });
@@ -2610,7 +2749,8 @@ async function createAdminBooking() {
         };
 
         // Salva su Firebase
-        await db.collection('bookings').add(bookingData);
+        const bookingRef = await db.collection('bookings').add(bookingData);
+        console.log('Prenotazione creata con successo:', bookingRef.id, bookingData);
 
         document.getElementById('addBookingForm').reset();
         document.getElementById('addBookingModal').classList.remove('show');
