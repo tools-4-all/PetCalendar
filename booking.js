@@ -503,8 +503,9 @@ function validateForm() {
         return false;
     }
     
-    if (!clientEmail || !isValidEmail(clientEmail)) {
-        showError('Inserisci un\'email valida.');
+    // Email è opzionale, ma se fornita deve essere valida
+    if (clientEmail && !isValidEmail(clientEmail)) {
+        showError('Inserisci un\'email valida o lascia il campo vuoto.');
         return false;
     }
     
