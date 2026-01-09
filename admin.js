@@ -272,18 +272,16 @@ function initEventListeners() {
     selectedDateInput.value = new Date().toISOString().split('T')[0];
 
     // Azioni prenotazione
-    document.getElementById('confirmBookingBtn').addEventListener('click', () => {
-        updateBookingStatus('confirmed');
-    });
-
     document.getElementById('completeBookingBtn').addEventListener('click', () => {
-        updateBookingStatus('completed');
+        markBookingCompleted();
     });
 
-    document.getElementById('cancelBookingBtn').addEventListener('click', () => {
-        if (confirm('Sei sicuro di voler annullare questa prenotazione?')) {
-            updateBookingStatus('cancelled');
-        }
+    document.getElementById('editBookingBtn').addEventListener('click', () => {
+        editBooking();
+    });
+
+    document.getElementById('deleteBookingBtn').addEventListener('click', () => {
+        deleteBooking();
     });
 
     // Filtri calendario
@@ -931,15 +929,26 @@ async function showBookingDetail(bookingId) {
 
         // Salva bookingId per le azioni
         modal.dataset.bookingId = bookingId;
+        modal.dataset.bookingData = JSON.stringify(booking);
         
-        // Mostra/nascondi pulsanti in base allo stato
-        const confirmBtn = document.getElementById('confirmBookingBtn');
+        // Mostra sempre i tre pulsanti
         const completeBtn = document.getElementById('completeBookingBtn');
-        const cancelBtn = document.getElementById('cancelBookingBtn');
+        const editBtn = document.getElementById('editBookingBtn');
+        const deleteBtn = document.getElementById('deleteBookingBtn');
 
-        confirmBtn.style.display = booking.status === 'pending' ? 'block' : 'none';
-        completeBtn.style.display = booking.status === 'confirmed' ? 'block' : 'none';
-        cancelBtn.style.display = booking.status !== 'cancelled' && booking.status !== 'completed' ? 'block' : 'none';
+        // Disabilita "Segna Completata" se già completata o cancellata
+        if (booking.status === 'completed' || booking.status === 'cancelled') {
+            completeBtn.disabled = true;
+            completeBtn.style.opacity = '0.5';
+        } else {
+            completeBtn.disabled = false;
+            completeBtn.style.opacity = '1';
+        }
+
+        // I pulsanti sono sempre visibili
+        completeBtn.style.display = 'inline-block';
+        editBtn.style.display = 'inline-block';
+        deleteBtn.style.display = 'inline-block';
 
         modal.classList.add('show');
     } catch (error) {
@@ -974,6 +983,173 @@ async function updateBookingStatus(newStatus) {
         alert(`Prenotazione ${newStatus} con successo!`);
     } catch (error) {
         alert('Errore nell\'aggiornamento: ' + error.message);
+    }
+}
+
+// Segna prenotazione come completata
+async function markBookingCompleted() {
+    const modal = document.getElementById('bookingDetailModal');
+    const bookingId = modal.dataset.bookingId;
+
+    if (!bookingId) return;
+
+    if (!confirm('Sei sicuro di voler segnare questa prenotazione come completata?')) {
+        return;
+    }
+
+    try {
+        const bookingRef = db.collection('bookings').doc(bookingId);
+        const bookingDoc = await bookingRef.get();
+        const booking = bookingDoc.data();
+
+        await bookingRef.update({
+            status: 'completed',
+            updatedAt: getTimestamp()
+        });
+
+        // Invia notifica
+        try {
+            await sendStatusNotification(booking, 'completed');
+        } catch (notifError) {
+            console.warn('Errore nell\'invio notifica:', notifError);
+        }
+
+        modal.classList.remove('show');
+        loadAdminData();
+        alert('Prenotazione segnata come completata!');
+    } catch (error) {
+        console.error('Errore nel completamento prenotazione:', error);
+        alert('Errore nel completamento della prenotazione: ' + error.message);
+    }
+}
+
+// Modifica prenotazione
+async function editBooking() {
+    const modal = document.getElementById('bookingDetailModal');
+    const bookingId = modal.dataset.bookingId;
+
+    if (!bookingId) {
+        alert('ID prenotazione non trovato');
+        return;
+    }
+
+    try {
+        // Recupera i dati direttamente dal database per avere il timestamp corretto
+        const bookingDoc = await db.collection('bookings').doc(bookingId).get();
+        
+        if (!bookingDoc.exists) {
+            alert('Prenotazione non trovata');
+            return;
+        }
+        
+        const booking = { id: bookingDoc.id, ...bookingDoc.data() };
+        
+        // Chiudi il modal dei dettagli
+        modal.classList.remove('show');
+        
+        // Apri il modal di modifica (riutilizziamo il modal di creazione)
+        const editModal = document.getElementById('addBookingModal');
+        const form = document.getElementById('addBookingForm');
+        
+        // Popola il form con i dati della prenotazione
+        document.getElementById('bookingClientName').value = booking.userName || '';
+        document.getElementById('bookingClientEmail').value = booking.userEmail || '';
+        document.getElementById('bookingClientPhone').value = booking.userPhone || '';
+        document.getElementById('bookingAnimalName').value = booking.animalName || '';
+        document.getElementById('bookingAnimalType').value = booking.animalType || '';
+        document.getElementById('bookingAnimalBreed').value = booking.animalBreed || '';
+        document.getElementById('bookingService').value = booking.service || '';
+        document.getElementById('bookingPrice').value = booking.price || '';
+        document.getElementById('bookingNotes').value = booking.notes || '';
+        
+        // Imposta data/ora - gestisci il timestamp Firestore correttamente
+        let date;
+        if (booking.dateTime) {
+            // Se è un Timestamp Firestore
+            if (booking.dateTime.toDate && typeof booking.dateTime.toDate === 'function') {
+                date = booking.dateTime.toDate();
+            } 
+            // Se è già una Date
+            else if (booking.dateTime instanceof Date) {
+                date = booking.dateTime;
+            }
+            // Se è un oggetto serializzato con seconds/nanoseconds
+            else if (booking.dateTime.seconds) {
+                date = new Date(booking.dateTime.seconds * 1000);
+            }
+            // Se è un numero (timestamp Unix)
+            else if (typeof booking.dateTime === 'number') {
+                date = new Date(booking.dateTime);
+            }
+            // Prova con timestampToDate come fallback
+            else {
+                date = timestampToDate(booking.dateTime);
+            }
+        } else {
+            date = new Date();
+        }
+        
+        // Verifica che la data sia valida
+        if (!date || isNaN(date.getTime())) {
+            console.error('Data non valida:', booking.dateTime);
+            date = new Date(); // Usa data corrente come fallback
+        }
+        
+        const dateTimeStr = date.toISOString().slice(0, 16);
+        document.getElementById('bookingDateTime').value = dateTimeStr;
+        
+        // Imposta operatore se presente
+        if (booking.operatorId) {
+            document.getElementById('bookingOperator').value = booking.operatorId;
+        } else {
+            document.getElementById('bookingOperator').value = '';
+        }
+        
+        // Salva l'ID della prenotazione da modificare
+        form.dataset.editingBookingId = bookingId;
+        
+        // Cambia il titolo del modal
+        const modalTitle = editModal.querySelector('h2');
+        if (modalTitle) {
+            modalTitle.textContent = 'Modifica Prenotazione';
+        }
+        
+        // Carica operatori
+        loadOperatorsForBooking();
+        
+        // Apri il modal
+        editModal.classList.add('show');
+    } catch (error) {
+        console.error('Errore nell\'apertura modifica prenotazione:', error);
+        console.error('Dettagli errore:', {
+            message: error.message,
+            stack: error.stack,
+            bookingId: bookingId
+        });
+        alert('Errore nell\'apertura della modifica: ' + error.message);
+    }
+}
+
+// Elimina prenotazione
+async function deleteBooking() {
+    const modal = document.getElementById('bookingDetailModal');
+    const bookingId = modal.dataset.bookingId;
+
+    if (!bookingId) return;
+
+    if (!confirm('Sei sicuro di voler eliminare questa prenotazione? Questa azione non può essere annullata.')) {
+        return;
+    }
+
+    try {
+        await db.collection('bookings').doc(bookingId).delete();
+        
+        modal.classList.remove('show');
+        loadAdminData();
+        alert('Prenotazione eliminata con successo!');
+    } catch (error) {
+        console.error('Errore nell\'eliminazione prenotazione:', error);
+        alert('Errore nell\'eliminazione della prenotazione: ' + error.message);
     }
 }
 
@@ -2621,13 +2797,24 @@ async function deleteAccount() {
 // Gestione Prenotazioni Admin
 function openAddBookingModal() {
     const modal = document.getElementById('addBookingModal');
+    const form = document.getElementById('addBookingForm');
     const dateTimeInput = document.getElementById('bookingDateTime');
+    
+    // Reset form e rimuovi flag di modifica
+    form.reset();
+    delete form.dataset.editingBookingId;
     
     // Imposta data/ora di default (domani alle 10:00)
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(10, 0, 0, 0);
     dateTimeInput.value = tomorrow.toISOString().slice(0, 16);
+    
+    // Imposta il titolo corretto
+    const modalTitle = modal.querySelector('h2');
+    if (modalTitle) {
+        modalTitle.textContent = 'Aggiungi Prenotazione';
+    }
     
     // Carica operatori nel select
     loadOperatorsForBooking();
@@ -2727,6 +2914,9 @@ async function createAdminBooking() {
         const now = new Date();
         const bookingStatus = bookingDateTime <= now ? 'confirmed' : 'pending';
 
+        const form = document.getElementById('addBookingForm');
+        const editingBookingId = form.dataset.editingBookingId;
+        
         const bookingData = {
             companyId: currentUser.uid, // Associa prenotazione all'azienda
             userId: userId,
@@ -2742,20 +2932,54 @@ async function createAdminBooking() {
             operatorId: operatorId || null,
             paymentMethod: 'presenza', // Solo pagamento in presenza
             notes: notes || '',
-            status: bookingStatus,
-            source: 'admin', // Indica che proviene dalla dashboard admin
-            createdAt: getTimestamp(),
             updatedAt: getTimestamp()
         };
 
-        // Salva su Firebase
-        const bookingRef = await db.collection('bookings').add(bookingData);
-        console.log('Prenotazione creata con successo:', bookingRef.id, bookingData);
+        if (editingBookingId) {
+            // Modifica prenotazione esistente
+            const bookingRef = db.collection('bookings').doc(editingBookingId);
+            const existingBooking = await bookingRef.get();
+            
+            if (!existingBooking.exists) {
+                alert('Prenotazione non trovata');
+                return;
+            }
+            
+            // Mantieni lo status originale se non è stato cambiato manualmente
+            const existingData = existingBooking.data();
+            bookingData.status = existingData.status;
+            bookingData.createdAt = existingData.createdAt; // Mantieni la data di creazione
+            bookingData.source = existingData.source || 'admin';
+            
+            await bookingRef.update(bookingData);
+            console.log('Prenotazione modificata con successo:', editingBookingId, bookingData);
+            
+            // Rimuovi il flag di modifica
+            delete form.dataset.editingBookingId;
+            
+            // Ripristina il titolo del modal
+            const modalTitle = document.querySelector('#addBookingModal h2');
+            if (modalTitle) {
+                modalTitle.textContent = 'Aggiungi Prenotazione';
+            }
+            
+            alert('Prenotazione modificata con successo!');
+        } else {
+            // Crea nuova prenotazione
+            // Determina lo status: se la data è passata, imposta come "confirmed"
+            const now = new Date();
+            bookingData.status = bookingDateTime <= now ? 'confirmed' : 'pending';
+            bookingData.source = 'admin'; // Indica che proviene dalla dashboard admin
+            bookingData.createdAt = getTimestamp();
+            
+            const bookingRef = await db.collection('bookings').add(bookingData);
+            console.log('Prenotazione creata con successo:', bookingRef.id, bookingData);
+            
+            alert('Prenotazione creata con successo!');
+        }
 
-        document.getElementById('addBookingForm').reset();
+        form.reset();
         document.getElementById('addBookingModal').classList.remove('show');
-        
-        alert('Prenotazione creata con successo!');
         
         // Non ricaricare manualmente - i listener Firestore si aggiorneranno automaticamente
         // Questo evita loop infiniti e "Maximum call stack size exceeded"
