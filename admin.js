@@ -24,6 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     loadAdminData();
     
+    // Verifica stato abbonamento dopo redirect da Stripe
+    if (typeof verifySubscriptionStatus === 'function') {
+        verifySubscriptionStatus();
+    }
+    
     auth.onAuthStateChanged((user) => {
         if (user) {
             currentUser = user;
@@ -2243,11 +2248,15 @@ async function loadSettings() {
             const planNames = {
                 'free': 'Piano FREE',
                 'pro': 'Piano PRO',
+                'monthly': 'PRO Mensile',
+                'yearly': 'PRO Annuale',
                 'enterprise': 'Piano ENTERPRISE'
             };
             const planDetails = {
                 'free': 'Fino a 50 prenotazioni/mese - 2 operatori',
                 'pro': 'Prenotazioni illimitate - Fino a 5 operatori',
+                'monthly': 'Prenotazioni illimitate - Fino a 5 operatori - €19,99/mese',
+                'yearly': 'Prenotazioni illimitate - Fino a 5 operatori - €119,99/anno',
                 'enterprise': 'Operatori e sedi illimitati - Tutte le funzionalità'
             };
 
@@ -2268,6 +2277,11 @@ async function loadSettings() {
             if (subscription.expiryDate) {
                 const expiry = subscription.expiryDate.toDate();
                 document.getElementById('subscriptionExpiry').textContent = `Scadenza: ${expiry.toLocaleDateString('it-IT')}`;
+            } else if (subscription.plan === 'monthly' || subscription.plan === 'yearly') {
+                // Per abbonamenti Stripe, mostra info dal customer portal se disponibile
+                if (subscription.stripeSubscriptionId) {
+                    document.getElementById('subscriptionExpiry').textContent = 'Abbonamento attivo - Gestisci da Stripe';
+                }
             }
         } else {
             // Default a FREE se non esiste abbonamento
@@ -2853,11 +2867,34 @@ async function handlePlanChange(plan) {
         return;
     }
 
+    // Gestisci abbonamenti mensili e annuali con Stripe
+    if (plan === 'monthly' || plan === 'yearly') {
+        const planName = plan === 'monthly' ? 'PRO Mensile (€19,99/mese)' : 'PRO Annuale (€119,99/anno)';
+        const price = plan === 'monthly' ? '19.99' : '119.99';
+        
+        const confirmUpgrade = confirm(`Vuoi sottoscrivere l'abbonamento ${planName}?`);
+        if (!confirmUpgrade) return;
+
+        try {
+            // Avvia checkout Stripe
+            if (typeof handleSubscriptionCheckout === 'function') {
+                await handleSubscriptionCheckout(plan, price);
+            } else {
+                alert('Sistema di pagamento non disponibile. Contatta il supporto: support@petcalendar.com');
+            }
+        } catch (error) {
+            console.error('Errore nel checkout:', error);
+            alert('Errore durante l\'avvio del pagamento. Riprova più tardi.');
+        }
+        return;
+    }
+
     if (plan === 'enterprise') {
         alert('Per il piano Enterprise, contatta il supporto: support@petcalendar.com');
         return;
     }
 
+    // Gestione legacy per altri piani
     const confirmUpgrade = confirm(`Vuoi passare al piano ${plan.toUpperCase()}?`);
     if (!confirmUpgrade) return;
 

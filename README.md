@@ -18,6 +18,8 @@ Sistema completo di prenotazioni online per toelettatori animali domestici. Sito
 - ✅ **Statistiche** - Visualizza prenotazioni del giorno, in attesa e completate
 - ✅ **Dettagli completi** - Accesso a tutte le informazioni su animali e clienti
 - ✅ **Link prenotazione pubblica** - Condividi un link con i clienti per prenotazioni dirette
+- ✅ **Sistema di abbonamenti** - Sottoscrivi piani PRO mensili o annuali
+- ✅ **Gestione fatturazione** - Visualizza e gestisci il tuo abbonamento
 
 ### Sistema di Notifiche:
 - ✅ **Promemoria automatici** via email
@@ -85,19 +87,38 @@ const firebaseConfig = {
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 ```
 
-### 3. Configurazione Stripe (Pagamenti Online - Opzionale)
+### 3. Configurazione Stripe (Abbonamenti e Pagamenti)
+
+PetCalendar supporta abbonamenti ricorrenti tramite Stripe:
+- **PRO Mensile**: €19,99/mese
+- **PRO Annuale**: €119,99/anno
+
+#### Setup Base
 
 1. Crea un account su [Stripe](https://stripe.com/)
-2. Ottieni la chiave pubblica API
-3. Aggiungi la chiave in `payment.js`
-4. Per pagamenti completi, configura Firebase Cloud Functions o un backend per gestire Payment Intents
-5. Aggiungi lo script Stripe in `index.html`:
+2. Ottieni la chiave pubblica API (Publishable key)
+3. Aggiungi la chiave in `payment.js`:
+   ```javascript
+   const STRIPE_PUBLIC_KEY = 'pk_test_...'; // Per test
+   ```
+4. Lo script Stripe è già incluso in `index.html` e `admin.html`
 
-```html
-<script src="https://js.stripe.com/v3/"></script>
-```
+#### Setup Completo (Backend Richiesto)
 
-**Nota:** Per un sito completamente statico, puoi usare Stripe Checkout che non richiede backend.
+Per gestire correttamente gli abbonamenti ricorrenti, è necessario configurare Firebase Cloud Functions:
+
+1. **Segui la guida completa** in `STRIPE_SETUP.md`
+2. **Crea i prodotti** in Stripe Dashboard:
+   - PRO Mensile: €19,99/mese (ricorrente)
+   - PRO Annuale: €119,99/anno (ricorrente)
+3. **Configura i webhook** per aggiornare automaticamente lo stato degli abbonamenti
+4. **Deploy delle funzioni** Firebase
+
+**Nota:** Senza backend, gli utenti vedranno un messaggio per contattare il supporto. Il backend è necessario per:
+- Creare sessioni di checkout sicure
+- Gestire rinnovi automatici
+- Aggiornare lo stato degli abbonamenti
+- Gestire cancellazioni e rimborsi
 
 ### 4. Deploy su GitHub Pages
 
@@ -119,7 +140,8 @@ PetCalendar/
 ├── admin.js            # Logica applicazione admin
 ├── booking.js          # Logica prenotazioni pubbliche
 ├── notifications.js    # Sistema notifiche
-├── payment.js          # Sistema pagamenti
+├── payment.js          # Sistema pagamenti e abbonamenti Stripe
+├── STRIPE_SETUP.md     # Guida completa configurazione Stripe
 └── README.md           # Questo file
 ```
 
@@ -206,11 +228,21 @@ Dalla dashboard admin puoi:
 
 Le prenotazioni pubbliche sono identificate dal campo `source: 'public'` nel database.
 
+## 💳 Piani e Abbonamenti
+
+PetCalendar offre diversi piani:
+
+- **FREE**: Fino a 50 prenotazioni/mese, 2 operatori, 1 sede
+- **PRO Mensile**: €19,99/mese - Prenotazioni illimitate, fino a 5 operatori, 3 sedi
+- **PRO Annuale**: €119,99/anno - Stesse funzionalità PRO con risparmio di €120/anno
+
+Gli abbonamenti vengono gestiti tramite Stripe e si rinnovano automaticamente. Vedi `STRIPE_SETUP.md` per la configurazione completa.
+
 ## 📝 Note
 
 - Per le notifiche SMS, puoi integrare Twilio o usare EmailJS con provider SMS
 - I promemoria automatici richiedono un sistema di cron job (es. Firebase Cloud Functions)
-- Per pagamenti completi con Stripe, considera l'uso di Firebase Cloud Functions
+- **Abbonamenti Stripe**: Richiedono Firebase Cloud Functions per funzionare completamente (vedi `STRIPE_SETUP.md`)
 - **Importante**: Assicurati di aver configurato il profilo azienda prima di condividere il link pubblico
 
 ## 🤝 Contribuire

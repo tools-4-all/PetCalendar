@@ -8,6 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -148,7 +149,7 @@
                 <div class="pricing-card pricing-featured">
                     <div class="pricing-badge">Più Popolare</div>
                     <h4>PRO</h4>
-                    <div class="pricing-price">€69<span>/mese</span></div>
+                    <div class="pricing-price">€19,99<span>/mese</span></div>
                     <p class="pricing-description">Per aziende in crescita</p>
                     <ul class="pricing-features">
                         <li>Prenotazioni illimitate</li>
@@ -159,22 +160,23 @@
                         <li>SMS automatici</li>
                         <li>Export dati</li>
                     </ul>
-                    <button class="btn btn-primary btn-large">Scegli PRO</button>
+                    <button class="btn btn-primary btn-large" data-plan="monthly" data-price="19.99">Scegli PRO Mensile</button>
                 </div>
                 <div class="pricing-card">
-                    <h4>ENTERPRISE</h4>
-                    <div class="pricing-price">€199<span>/mese</span></div>
-                    <p class="pricing-description">Per grandi aziende</p>
+                    <h4>PRO ANNUALE</h4>
+                    <div class="pricing-price">€119,99<span>/anno</span></div>
+                    <p class="pricing-description">Risparmia con l'abbonamento annuale</p>
                     <ul class="pricing-features">
-                        <li>Operatori illimitati</li>
-                        <li>Sedi illimitate</li>
-                        <li>API access</li>
-                        <li>App mobile</li>
-                        <li>Marketing automation</li>
-                        <li>White-label completo</li>
-                        <li>Supporto 24/7</li>
+                        <li>Prenotazioni illimitate</li>
+                        <li>Fino a 5 operatori</li>
+                        <li>Fino a 3 sedi</li>
+                        <li>Reportistica avanzata</li>
+                        <li>Integrazione pagamenti</li>
+                        <li>SMS automatici</li>
+                        <li>Export dati</li>
+                        <li><strong>Risparmio di €120 all'anno</strong></li>
                     </ul>
-                    <button class="btn btn-outline btn-large">Contattaci</button>
+                    <button class="btn btn-primary btn-large" data-plan="yearly" data-price="119.99">Scegli PRO Annuale</button>
                 </div>
             </div>
         </div>
@@ -214,6 +216,7 @@
     </div>
 
     <script src="firebase-config.js"></script>
+    <script src="payment.js"></script>
     <script>
         // Variabili globali
         let currentUser = null;
@@ -631,6 +634,34 @@
                     }
                 });
             }
+
+            // Event listeners per pulsanti abbonamento
+            const subscriptionButtons = document.querySelectorAll('[data-plan]');
+            subscriptionButtons.forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    const plan = button.getAttribute('data-plan');
+                    const price = button.getAttribute('data-price');
+                    
+                    // Verifica se l'utente è autenticato
+                    if (!currentUser) {
+                        alert('Devi effettuare il login per sottoscrivere un abbonamento');
+                        const loginModal = document.getElementById('loginModal');
+                        if (loginModal) {
+                            loginModal.classList.add('show');
+                        }
+                        return;
+                    }
+                    
+                    // Avvia il processo di checkout Stripe
+                    try {
+                        await handleSubscriptionCheckout(plan, price);
+                    } catch (error) {
+                        console.error('Errore nel checkout:', error);
+                        alert('Errore durante l\'avvio del pagamento. Riprova più tardi.');
+                    }
+                });
+            });
         }
     </script>
 </body>

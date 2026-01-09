@@ -12,6 +12,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -357,7 +358,7 @@
                         <div class="plan-card plan-featured">
                             <div class="plan-badge">Consigliato</div>
                             <h4>PRO</h4>
-                            <div class="plan-price">€69<span>/mese</span></div>
+                            <div class="plan-price">€19,99<span>/mese</span></div>
                             <ul class="plan-features">
                                 <li>Prenotazioni illimitate</li>
                                 <li>Fino a 5 operatori</li>
@@ -367,21 +368,23 @@
                                 <li>SMS automatici</li>
                                 <li>Export dati</li>
                             </ul>
-                            <button class="btn btn-primary plan-btn" data-plan="pro">Passa a PRO</button>
+                            <button class="btn btn-primary plan-btn" data-plan="monthly" data-price="19.99">Abbonati Mensile</button>
                         </div>
                         <div class="plan-card">
-                            <h4>ENTERPRISE</h4>
-                            <div class="plan-price">€199<span>/mese</span></div>
+                            <div class="plan-badge">Risparmio</div>
+                            <h4>PRO ANNUALE</h4>
+                            <div class="plan-price">€119,99<span>/anno</span></div>
                             <ul class="plan-features">
-                                <li>Operatori illimitati</li>
-                                <li>Sedi illimitate</li>
-                                <li>API access</li>
-                                <li>App mobile</li>
-                                <li>Marketing automation</li>
-                                <li>White-label completo</li>
-                                <li>Supporto 24/7</li>
+                                <li>Prenotazioni illimitate</li>
+                                <li>Fino a 5 operatori</li>
+                                <li>Fino a 3 sedi</li>
+                                <li>Reportistica avanzata</li>
+                                <li>Integrazione pagamenti</li>
+                                <li>SMS automatici</li>
+                                <li>Export dati</li>
+                                <li><strong>Risparmio di €120 all'anno</strong></li>
                             </ul>
-                            <button class="btn btn-outline plan-btn" data-plan="enterprise">Contattaci</button>
+                            <button class="btn btn-primary plan-btn" data-plan="yearly" data-price="119.99">Abbonati Annuale</button>
                         </div>
                     </div>
                 </div>
@@ -648,6 +651,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="firebase-config.js"></script>
+    <script src="payment.js"></script>
     <script src="notifications.js"></script>
     <script src="admin.js"></script>
     <script>

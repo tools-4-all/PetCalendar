@@ -1,51 +1,159 @@
-// Sistema di pagamento con Stripe
+// Sistema di pagamento con Stripe per abbonamenti
 // IMPORTANTE: Configura Stripe su https://stripe.com/
 // e aggiungi la tua chiave pubblica qui
 
-const STRIPE_PUBLIC_KEY = 'YOUR_STRIPE_PUBLIC_KEY';
-
-// Carica Stripe.js (da aggiungere nell'HTML)
-// <script src="https://js.stripe.com/v3/"></script>
-
-let stripe = null;
-let elements = null;
-let cardElement = null;
+const STRIPE_PUBLIC_KEY = 'pk_live_51SnaAiAf30HNX2wt6tSHH4eU7jPnhuwQv9nJ6agCJQBkj1YeL9AO7SAn1dERr4APvu4gI0S3g9G9dzDGYLmlpWVb00eF5zmoJ7';
 
 // Inizializza Stripe
+let stripe = null;
+
 function initStripe() {
     if (typeof Stripe !== 'undefined' && STRIPE_PUBLIC_KEY !== 'YOUR_STRIPE_PUBLIC_KEY') {
         stripe = Stripe(STRIPE_PUBLIC_KEY);
-        elements = stripe.elements();
+        return true;
+    }
+    return false;
+}
+
+// Prezzi abbonamenti (in centesimi - €)
+const SUBSCRIPTION_PRICES = {
+    'monthly': 1999, // €19.99
+    'yearly': 11999  // €119.99
+};
+
+// Nomi dei piani
+const PLAN_NAMES = {
+    'monthly': 'PRO Mensile',
+    'yearly': 'PRO Annuale'
+};
+
+// Gestisci checkout abbonamento
+window.handleSubscriptionCheckout = async function(planType, price) {
+    try {
+        // Verifica che Stripe sia configurato
+        if (!initStripe()) {
+            alert('Stripe non è configurato. Contatta il supporto per completare l\'abbonamento.');
+            console.warn('Stripe non configurato - STRIPE_PUBLIC_KEY deve essere impostata');
+            return;
+        }
+
+        if (!currentUser) {
+            alert('Devi effettuare il login per sottoscrivere un abbonamento');
+            return;
+        }
+
+        // Crea sessione checkout Stripe
+        // NOTA: Per funzionare completamente, serve un backend (Firebase Cloud Functions)
+        // che crei la sessione di checkout. Per ora implementiamo la struttura base.
         
-        // Crea elemento carta (da aggiungere nel form di pagamento)
-        const style = {
-            base: {
-                color: '#32325d',
-                fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-                fontSmoothing: 'antialiased',
-                fontSize: '16px',
-                '::placeholder': {
-                    color: '#aab7c4'
-                }
-            },
-            invalid: {
-                color: '#fa755a',
-                iconColor: '#fa755a'
+        const checkoutSession = await createCheckoutSession(planType, price);
+        
+        if (checkoutSession && checkoutSession.url) {
+            // Reindirizza a Stripe Checkout
+            window.location.href = checkoutSession.url;
+        } else {
+            // Fallback: mostra messaggio per configurazione backend
+            alert('Il sistema di pagamento è in fase di configurazione. Per completare l\'abbonamento, contatta il supporto: support@petcalendar.com');
+        }
+    } catch (error) {
+        console.error('Errore nel checkout abbonamento:', error);
+        alert('Errore durante l\'avvio del pagamento. Riprova più tardi.');
+    }
+};
+
+// Crea sessione Checkout Stripe
+// NOTA: Questa funzione richiede un backend (Firebase Cloud Functions o altro)
+// per creare la sessione di checkout in modo sicuro
+async function createCheckoutSession(planType, price) {
+    try {
+        // Opzione 1: Usa Firebase Cloud Functions se disponibile
+        if (typeof firebase !== 'undefined' && firebase.functions) {
+            const functions = firebase.functions();
+            const createCheckoutSession = functions.httpsCallable('createSubscriptionCheckout');
+            
+            const result = await createCheckoutSession({
+                planType: planType,
+                price: price,
+                userId: currentUser.uid,
+                userEmail: currentUser.email
+            });
+            
+            return result.data;
+        }
+        
+        // Opzione 2: Usa un endpoint backend personalizzato
+        // Sostituisci con il tuo endpoint backend
+        const backendUrl = 'YOUR_BACKEND_URL/api/create-checkout-session';
+        
+        try {
+            const response = await fetch(backendUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${await currentUser.getIdToken()}`
+                },
+                body: JSON.stringify({
+                    planType: planType,
+                    price: price,
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                return data;
             }
-        };
-
-        cardElement = elements.create('card', { style: style });
+        } catch (fetchError) {
+            console.warn('Backend non disponibile:', fetchError);
+        }
+        
+        // Se nessun backend è disponibile, ritorna null
+        // L'utente vedrà un messaggio per contattare il supporto
+        return null;
+    } catch (error) {
+        console.error('Errore nella creazione sessione checkout:', error);
+        return null;
     }
 }
 
-// Monta elemento carta nel container
-function mountCardElement(containerId) {
-    if (cardElement) {
-        cardElement.mount(`#${containerId}`);
+// Verifica stato abbonamento dopo redirect da Stripe
+window.verifySubscriptionStatus = async function() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
+        const success = urlParams.get('success');
+        
+        if (success === 'true' && sessionId) {
+            // Verifica lo stato dell'abbonamento nel database
+            if (typeof db !== 'undefined' && db && currentUser) {
+                const subscriptionDoc = await db.collection('subscriptions').doc(currentUser.uid).get();
+                
+                if (subscriptionDoc.exists) {
+                    const subscription = subscriptionDoc.data();
+                    if (subscription.status === 'active') {
+                        alert('Abbonamento attivato con successo!');
+                        // Rimuovi i parametri dalla URL
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        // Se siamo in admin.html, ricarica le impostazioni
+                        if (window.location.pathname.includes('admin.html')) {
+                            if (typeof loadSettings === 'function') {
+                                loadSettings();
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (success === 'false') {
+            alert('Il pagamento è stato annullato.');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    } catch (error) {
+        console.error('Errore nella verifica abbonamento:', error);
     }
-}
+};
 
-// Prezzi servizi (in centesimi - €)
+// Gestisci pagamento servizi (mantenuto per compatibilità)
 const SERVICE_PRICES = {
     'toelettatura-completa': 5000, // €50.00
     'bagno': 2500, // €25.00
@@ -54,26 +162,26 @@ const SERVICE_PRICES = {
     'taglio-pelo': 3000 // €30.00
 };
 
-// Gestisci pagamento online
+// Gestisci pagamento online per servizi
 window.handleOnlinePayment = async function(bookingId, bookingData) {
     try {
         // Se Stripe non è configurato, salva solo lo stato del pagamento
-        if (!stripe || !cardElement || STRIPE_PUBLIC_KEY === 'YOUR_STRIPE_PUBLIC_KEY') {
+        if (!initStripe() || STRIPE_PUBLIC_KEY === 'YOUR_STRIPE_PUBLIC_KEY') {
             console.warn('Stripe non configurato - la prenotazione è stata creata');
-        // Aggiorna solo se necessario (evita loop)
-        if (typeof db !== 'undefined' && db) {
-            try {
-                const bookingDoc = await db.collection('bookings').doc(bookingId).get();
-                if (bookingDoc.exists && !bookingDoc.data().paymentStatus) {
-                    await db.collection('bookings').doc(bookingId).update({
-                        paymentStatus: 'pending',
-                        paymentMethod: 'online'
-                    });
+            // Aggiorna solo se necessario (evita loop)
+            if (typeof db !== 'undefined' && db) {
+                try {
+                    const bookingDoc = await db.collection('bookings').doc(bookingId).get();
+                    if (bookingDoc.exists && !bookingDoc.data().paymentStatus) {
+                        await db.collection('bookings').doc(bookingId).update({
+                            paymentStatus: 'pending',
+                            paymentMethod: 'online'
+                        });
+                    }
+                } catch (updateError) {
+                    console.warn('Impossibile aggiornare stato pagamento:', updateError);
                 }
-            } catch (updateError) {
-                console.warn('Impossibile aggiornare stato pagamento:', updateError);
             }
-        }
             return;
         }
 
@@ -84,27 +192,22 @@ window.handleOnlinePayment = async function(bookingId, bookingData) {
         // Questo è un esempio semplificato
         
         // Opzione 1: Stripe Checkout (più semplice per siti statici)
-        const session = await createCheckoutSession(bookingId, amount, bookingData);
+        const session = await createServiceCheckoutSession(bookingId, amount, bookingData);
         
         if (session && session.url) {
             // Reindirizza a Stripe Checkout
             window.location.href = session.url;
         } else {
-            // Opzione 2: Payment Element (richiede backend per Payment Intent)
-            await processPaymentWithCard(bookingId, amount, bookingData);
+            console.warn('Impossibile creare sessione checkout per servizio');
         }
     } catch (error) {
         console.error('Errore nel pagamento:', error);
         // Non mostrare alert per evitare interruzioni - la prenotazione è già stata creata
     }
-}
+};
 
-// Crea sessione Checkout (richiede backend)
-async function createCheckoutSession(bookingId, amount, bookingData) {
-    // Per un sito statico, puoi usare Stripe Checkout con un webhook
-    // o integrare con un servizio serverless (Firebase Cloud Functions, Vercel, etc.)
-    
-    // Esempio con Firebase Cloud Functions:
+// Crea sessione Checkout per servizi
+async function createServiceCheckoutSession(bookingId, amount, bookingData) {
     try {
         // Controlla se Firebase Functions è disponibile
         if (typeof firebase === 'undefined' || !firebase.functions) {
@@ -113,7 +216,7 @@ async function createCheckoutSession(bookingId, amount, bookingData) {
         }
         
         const functions = firebase.functions();
-        const createCheckoutSession = functions.httpsCallable('createCheckoutSession');
+        const createCheckoutSession = functions.httpsCallable('createServiceCheckoutSession');
         
         const result = await createCheckoutSession({
             bookingId: bookingId,
@@ -127,62 +230,6 @@ async function createCheckoutSession(bookingId, amount, bookingData) {
     } catch (error) {
         console.error('Errore nella creazione della sessione:', error);
         return null;
-    }
-}
-
-// Processa pagamento con carta (richiede backend)
-async function processPaymentWithCard(bookingId, amount, bookingData) {
-    // Questo richiede un backend per creare il Payment Intent
-    // Per un sito statico, usa Stripe Checkout invece
-    
-    try {
-        // Controlla se Firebase Functions è disponibile
-        if (typeof firebase === 'undefined' || !firebase.functions) {
-            console.warn('Firebase Functions non disponibile');
-            return;
-        }
-        
-        const functions = firebase.functions();
-        const createPaymentIntent = functions.httpsCallable('createPaymentIntent');
-        
-        const { clientSecret } = await createPaymentIntent({
-            amount: amount,
-            currency: 'eur',
-            bookingId: bookingId
-        });
-
-        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-            payment_method: {
-                card: cardElement,
-                billing_details: {
-                    email: bookingData.userEmail
-                }
-            }
-        });
-
-        if (error) {
-            throw error;
-        }
-
-        if (paymentIntent.status === 'succeeded') {
-            // Verifica che db sia disponibile
-            if (typeof db !== 'undefined' && db) {
-                const timestamp = typeof getTimestamp === 'function' 
-                    ? getTimestamp() 
-                    : firebase.firestore.Timestamp.now();
-                    
-                await db.collection('bookings').doc(bookingId).update({
-                    paymentStatus: 'paid',
-                    paymentIntentId: paymentIntent.id,
-                    paidAt: timestamp
-                });
-            }
-            
-            alert('Pagamento completato con successo!');
-        }
-    } catch (error) {
-        console.error('Errore nel pagamento:', error);
-        // Non rilanciare l'errore per evitare loop
     }
 }
 
@@ -217,3 +264,13 @@ function displayServicePrice(service) {
     return formatPrice(price);
 }
 
+// Inizializza Stripe al caricamento
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initStripe();
+        // Verifica stato abbonamento se ci sono parametri nella URL
+        if (window.location.search.includes('session_id')) {
+            verifySubscriptionStatus();
+        }
+    });
+}
