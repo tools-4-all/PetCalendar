@@ -2294,15 +2294,6 @@ async function loadSettings() {
         // Carica email account
         document.getElementById('accountEmail').value = currentUser.email || '';
 
-        // Carica preferenze notifiche
-        const userDoc = await db.collection('users').doc(currentUser.uid).get();
-        if (userDoc.exists) {
-            const userData = userDoc.data();
-            document.getElementById('notifyEmail').checked = userData.notifyEmail !== false;
-            document.getElementById('notifySMS').checked = userData.notifySMS === true;
-            document.getElementById('notifyReminders').checked = userData.notifyReminders !== false;
-        }
-
         // Genera e mostra il link di prenotazione
         loadBookingLink();
     } catch (error) {
