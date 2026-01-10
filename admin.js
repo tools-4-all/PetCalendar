@@ -1510,7 +1510,7 @@ function createOperatorCard(operator) {
     card.className = 'operator-card';
     card.innerHTML = `
         <h4>${operator.name}</h4>
-        <p><strong>Email:</strong> ${operator.email}</p>
+        <p><strong>Email:</strong> ${operator.email || 'N/A'}</p>
         <p><strong>Telefono:</strong> ${operator.phone || 'N/A'}</p>
         <p><strong>Ruolo:</strong> ${operator.role === 'manager' ? 'Manager' : 'Operatore'}</p>
         <div class="operator-actions">
