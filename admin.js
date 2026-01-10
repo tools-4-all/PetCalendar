@@ -1505,26 +1505,18 @@ async function saveOperator() {
                       (subscription.status !== 'active');
     
     const FREE_PLAN_OPERATORS_LIMIT = 2;
-    const PRO_PLAN_OPERATORS_LIMIT = 3;
     
     // Conta gli operatori esistenti
     const operatorsSnapshot = await db.collection('operators').get();
     const currentOperatorsCount = operatorsSnapshot.size;
     
-    // Determina il limite in base al piano
-    let maxOperators;
-    if (isFreePlan) {
-        maxOperators = FREE_PLAN_OPERATORS_LIMIT;
-    } else {
-        maxOperators = PRO_PLAN_OPERATORS_LIMIT;
-    }
-    
     // Verifica se si sta aggiungendo un nuovo operatore o modificando uno esistente
     const operatorForm = document.getElementById('operatorForm');
     const editingOperatorId = operatorForm.dataset.editingOperatorId;
     
-    if (!editingOperatorId && currentOperatorsCount >= maxOperators) {
-        showOperatorsLimitExceededModal(currentOperatorsCount, maxOperators);
+    // Controlla il limite solo per utenti FREE (PRO ha operatori illimitati)
+    if (isFreePlan && !editingOperatorId && currentOperatorsCount >= FREE_PLAN_OPERATORS_LIMIT) {
+        showOperatorsLimitExceededModal(currentOperatorsCount, FREE_PLAN_OPERATORS_LIMIT);
         return;
     }
 
@@ -2537,9 +2529,9 @@ async function loadSettings() {
             };
             const planDetails = {
                 'free': 'Fino a 20 prenotazioni/mese - 2 operatori',
-                'pro': 'Prenotazioni illimitate - Fino a 3 operatori',
-                'monthly': 'Prenotazioni illimitate - Fino a 3 operatori - €19/mese',
-                'yearly': 'Prenotazioni illimitate - Fino a 3 operatori - €119/anno',
+                'pro': 'Prenotazioni illimitate - Operatori illimitati',
+                'monthly': 'Prenotazioni illimitate - Operatori illimitati - €19/mese',
+                'yearly': 'Prenotazioni illimitate - Operatori illimitati - €119/anno',
                 'enterprise': 'Operatori illimitati - Tutte le funzionalità'
             };
 
