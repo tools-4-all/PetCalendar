@@ -1986,3 +1986,228 @@ body {
     transform: scale(0.95);
 }
 
+/* Limit Exceeded Modal Styles */
+.limit-modal-content {
+    max-width: 500px;
+    max-height: 85vh;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.limit-modal-header {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+    color: white;
+    padding: 1.5rem;
+    text-align: center;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.limit-icon {
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.limit-icon svg {
+    color: white;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    width: 48px;
+    height: 48px;
+}
+
+.limit-modal-header h2 {
+    color: white;
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.limit-modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.limit-message {
+    font-size: 1rem;
+    color: var(--dark-color);
+    margin-bottom: 1rem;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.limit-stats {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid #f59e0b;
+    border-radius: var(--border-radius-lg);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.limit-stat-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.limit-stat-label {
+    font-size: 1rem;
+    color: var(--dark-color);
+    font-weight: 500;
+}
+
+.limit-stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #dc2626;
+}
+
+.limit-stat-separator {
+    font-size: 1.25rem;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.limit-stat-limit {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--dark-color);
+}
+
+.limit-upgrade-info {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius-lg);
+    padding: 1.25rem;
+}
+
+.upgrade-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.75rem;
+    text-align: center;
+}
+
+.upgrade-features {
+    list-style: none;
+    padding: 0;
+    margin: 0.75rem 0;
+}
+
+.upgrade-features li {
+    padding: 0.35rem 0;
+    color: var(--dark-color);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.upgrade-pricing {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.pricing-option {
+    flex: 1;
+    min-width: 180px;
+    background: white;
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    padding: 0.75rem;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.pricing-option.highlight {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-color: #f59e0b;
+    position: relative;
+}
+
+.pricing-option.highlight::before {
+    content: "⭐ POPOLARE";
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #f59e0b;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.pricing-option strong {
+    display: block;
+    font-size: 1.25rem;
+    color: var(--primary-color);
+    margin-bottom: 0.35rem;
+}
+
+.pricing-option .savings {
+    display: block;
+    font-size: 0.8rem;
+    color: #dc2626;
+    font-weight: 600;
+    margin-top: 0.2rem;
+}
+
+.limit-modal-footer {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+.limit-modal-footer .btn {
+    min-width: 120px;
+}
+
+@media (max-width: 768px) {
+    .limit-modal-content {
+        max-width: 95%;
+    }
+    
+    .limit-modal-header {
+        padding: 1.5rem;
+    }
+    
+    .limit-modal-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .limit-modal-body {
+        padding: 1.5rem;
+    }
+    
+    .upgrade-pricing {
+        flex-direction: column;
+    }
+    
+    .pricing-option {
+        min-width: 100%;
+    }
+    
+    .limit-modal-footer {
+        flex-direction: column;
+    }
+    
+    .limit-modal-footer .btn {
+        width: 100%;
+    }
+}
+

@@ -2494,15 +2494,26 @@ async function loadSettings() {
                 'enterprise': 'Piano ENTERPRISE'
             };
             const planDetails = {
-                'free': 'Fino a 50 prenotazioni/mese - 2 operatori',
+                'free': 'Fino a 20 prenotazioni/mese - 2 operatori',
                 'pro': 'Prenotazioni illimitate - Fino a 5 operatori',
                 'monthly': 'Prenotazioni illimitate - Fino a 5 operatori - €19/mese',
                 'yearly': 'Prenotazioni illimitate - Fino a 5 operatori - €119/anno',
                 'enterprise': 'Operatori e sedi illimitati - Tutte le funzionalità'
             };
 
-            document.getElementById('currentPlanName').textContent = planNames[subscription.plan] || 'Piano FREE';
-            document.getElementById('currentPlanDetails').textContent = planDetails[subscription.plan] || '';
+            // Mostra il tipo di abbonamento con più dettagli
+            const planName = planNames[subscription.plan] || 'Piano FREE';
+            let planDetail = planDetails[subscription.plan] || '';
+            
+            // Aggiungi informazioni aggiuntive se disponibili
+            if (subscription.plan === 'monthly' || subscription.plan === 'yearly') {
+                if (subscription.stripeSubscriptionId) {
+                    planDetail += ` (ID Stripe: ${subscription.stripeSubscriptionId.substring(0, 12)}...)`;
+                }
+            }
+            
+            document.getElementById('currentPlanName').textContent = planName;
+            document.getElementById('currentPlanDetails').textContent = planDetail;
 
             if (subscription.status === 'active') {
                 document.getElementById('subscriptionStatus').textContent = 'Attivo';
@@ -2515,19 +2526,34 @@ async function loadSettings() {
                 document.getElementById('subscriptionStatus').className = 'status-badge status-inactive';
             }
 
+            // Mostra data di scadenza con dettagli
             if (subscription.expiryDate) {
                 const expiry = subscription.expiryDate.toDate();
-                document.getElementById('subscriptionExpiry').textContent = `Scadenza: ${expiry.toLocaleDateString('it-IT')}`;
+                const now = new Date();
+                const daysUntilExpiry = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+                
+                if (daysUntilExpiry > 0) {
+                    document.getElementById('subscriptionExpiry').textContent = 
+                        `Scadenza: ${expiry.toLocaleDateString('it-IT')} (${daysUntilExpiry} giorni rimanenti)`;
+                } else {
+                    document.getElementById('subscriptionExpiry').textContent = 
+                        `Scaduto il: ${expiry.toLocaleDateString('it-IT')}`;
+                }
             } else if (subscription.plan === 'monthly' || subscription.plan === 'yearly') {
                 // Per abbonamenti Stripe, mostra info dal customer portal se disponibile
                 if (subscription.stripeSubscriptionId) {
-                    document.getElementById('subscriptionExpiry').textContent = 'Abbonamento attivo - Gestisci da Stripe';
+                    document.getElementById('subscriptionExpiry').textContent = 
+                        'Abbonamento ricorrente attivo - Gestisci da Stripe';
+                } else {
+                    document.getElementById('subscriptionExpiry').textContent = 'Scadenza: Non disponibile';
                 }
+            } else {
+                document.getElementById('subscriptionExpiry').textContent = 'Scadenza: Illimitato';
             }
         } else {
             // Default a FREE se non esiste abbonamento
             document.getElementById('currentPlanName').textContent = 'Piano FREE';
-            document.getElementById('currentPlanDetails').textContent = 'Fino a 50 prenotazioni/mese - 2 operatori';
+            document.getElementById('currentPlanDetails').textContent = 'Fino a 20 prenotazioni/mese - 2 operatori';
             document.getElementById('subscriptionStatus').textContent = 'Attivo';
             document.getElementById('subscriptionStatus').className = 'status-badge status-active';
         }
@@ -3273,6 +3299,57 @@ async function loadOperatorsForBooking() {
     }
 }
 
+// Mostra modal limite prenotazioni superato
+function showLimitExceededModal(currentCount, maxCount) {
+    const modal = document.getElementById('limitExceededModal');
+    const currentCountEl = document.getElementById('limitCurrentCount');
+    const maxCountEl = document.getElementById('limitMaxCount');
+    const messageEl = document.getElementById('limitMessage');
+    
+    if (!modal || !currentCountEl || !maxCountEl || !messageEl) {
+        // Fallback a alert se il modal non esiste
+        alert(`Hai superato il limite di ${maxCount} prenotazioni mensili del piano FREE.\n\n` +
+              `Prenotazioni del mese corrente: ${currentCount}/${maxCount}\n\n` +
+              `Per creare più prenotazioni, passa al piano PRO (€19/mese o €119/anno) che offre prenotazioni illimitate.\n\n` +
+              `Vai alle Impostazioni per aggiornare il tuo piano.`);
+        return;
+    }
+    
+    currentCountEl.textContent = currentCount;
+    maxCountEl.textContent = maxCount;
+    messageEl.textContent = `Hai superato il limite di ${maxCount} prenotazioni mensili del piano FREE.`;
+    
+    modal.classList.add('show');
+    
+    // Gestisci chiusura modal
+    const closeBtn = document.getElementById('limitModalCloseBtn');
+    const upgradeBtn = document.getElementById('limitModalUpgradeBtn');
+    
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            modal.classList.remove('show');
+        };
+    }
+    
+    if (upgradeBtn) {
+        upgradeBtn.onclick = () => {
+            modal.classList.remove('show');
+            // Vai alla sezione impostazioni
+            const settingsTab = document.querySelector('[data-tab="settings"]');
+            if (settingsTab) {
+                settingsTab.click();
+            }
+        };
+    }
+    
+    // Chiudi cliccando fuori dal modal
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('show');
+        }
+    };
+}
+
 async function createAdminBooking() {
     if (!currentUser) return;
 
@@ -3397,6 +3474,37 @@ async function createAdminBooking() {
             alert('Prenotazione modificata con successo!');
         } else {
             // Crea nuova prenotazione
+            // Controlla il limite di prenotazioni mensili per utenti FREE
+            const subscriptionDoc = await db.collection('subscriptions').doc(currentUser.uid).get();
+            const subscription = subscriptionDoc.exists ? subscriptionDoc.data() : null;
+            
+            // Verifica se l'utente ha un abbonamento FREE o nessun abbonamento
+            const isFreePlan = !subscription || 
+                              !subscription.plan || 
+                              subscription.plan === 'free' ||
+                              (subscription.status !== 'active');
+            
+            if (isFreePlan) {
+                // Conta le prenotazioni del mese corrente
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                
+                const monthlyBookingsQuery = await db.collection('bookings')
+                    .where('companyId', '==', currentUser.uid)
+                    .where('dateTime', '>=', firebase.firestore.Timestamp.fromDate(startOfMonth))
+                    .where('dateTime', '<=', firebase.firestore.Timestamp.fromDate(endOfMonth))
+                    .get();
+                
+                const monthlyBookingsCount = monthlyBookingsQuery.size;
+                const FREE_PLAN_LIMIT = 20;
+                
+                if (monthlyBookingsCount >= FREE_PLAN_LIMIT) {
+                    showLimitExceededModal(monthlyBookingsCount, FREE_PLAN_LIMIT);
+                    return;
+                }
+            }
+            
             // Determina lo status: se la data è passata, imposta come "confirmed"
             const now = new Date();
             bookingData.status = bookingDateTime <= now ? 'confirmed' : 'pending';
@@ -4100,4 +4208,5 @@ function calculateKeyMetrics(bookings, prevBookings) {
         : '-';
     document.getElementById('peakHour').textContent = peakHour !== '-' ? peakHour + ':00' : '-';
 }
+
 

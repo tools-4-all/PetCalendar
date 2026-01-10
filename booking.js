@@ -542,6 +542,41 @@ async function submitBooking() {
             });
         }
         
+        // Controlla il limite di prenotazioni mensili per aziende FREE
+        const subscriptionDoc = await db.collection('subscriptions').doc(companyId).get();
+        const subscription = subscriptionDoc.exists ? subscriptionDoc.data() : null;
+        
+        // Verifica se l'azienda ha un abbonamento FREE o nessun abbonamento
+        const isFreePlan = !subscription || 
+                          !subscription.plan || 
+                          subscription.plan === 'free' ||
+                          (subscription.status !== 'active');
+        
+        if (isFreePlan) {
+            // Conta le prenotazioni del mese corrente
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+            
+            const monthlyBookingsQuery = await db.collection('bookings')
+                .where('companyId', '==', companyId)
+                .where('dateTime', '>=', firebase.firestore.Timestamp.fromDate(startOfMonth))
+                .where('dateTime', '<=', firebase.firestore.Timestamp.fromDate(endOfMonth))
+                .get();
+            
+            const monthlyBookingsCount = monthlyBookingsQuery.size;
+            const FREE_PLAN_LIMIT = 20;
+            
+            if (monthlyBookingsCount >= FREE_PLAN_LIMIT) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Invia Prenotazione';
+                showError(`L'azienda ha superato il limite di ${FREE_PLAN_LIMIT} prenotazioni mensili del piano FREE.\n\n` +
+                         `Prenotazioni del mese corrente: ${monthlyBookingsCount}/${FREE_PLAN_LIMIT}\n\n` +
+                         `Per creare più prenotazioni, l'azienda deve passare al piano PRO (€19/mese o €119/anno) che offre prenotazioni illimitate.\n\n` +
+                         `Contatta l'azienda per maggiori informazioni.`);
+                return;
+            }
+        }
+        
         // Crea prenotazione
         const bookingData = {
             companyId: companyId,

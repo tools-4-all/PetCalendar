@@ -332,7 +332,7 @@
                         <div class="subscription-info">
                             <div class="subscription-plan">
                                 <h4 id="currentPlanName">Piano FREE</h4>
-                                <p id="currentPlanDetails">Fino a 50 prenotazioni/mese - 2 operatori</p>
+                                <p id="currentPlanDetails">Fino a 20 prenotazioni/mese - 2 operatori</p>
                             </div>
                             <div class="subscription-status">
                                 <span id="subscriptionStatus" class="status-badge status-active">Attivo</span>
@@ -351,7 +351,7 @@
                             <h4>FREE</h4>
                             <div class="plan-price">€0<span>/mese</span></div>
                             <ul class="plan-features">
-                                <li>Fino a 50 prenotazioni/mese</li>
+                                <li>Fino a 20 prenotazioni/mese</li>
                                 <li>Fino a 2 operatori</li>
                                 <li>1 sede</li>
                                 <li>Calendario base</li>
@@ -709,6 +709,53 @@
                         una gestione ottimale delle prenotazioni!
                     </p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Limit Exceeded Modal -->
+    <div id="limitExceededModal" class="modal">
+        <div class="modal-content limit-modal-content">
+            <div class="limit-modal-header">
+                <div class="limit-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h2>Limite Prenotazioni Raggiunto</h2>
+            </div>
+            <div class="limit-modal-body">
+                <p class="limit-message" id="limitMessage">Hai superato il limite di prenotazioni mensili del piano FREE.</p>
+                <div class="limit-stats">
+                    <div class="limit-stat-item">
+                        <span class="limit-stat-label">Prenotazioni del mese:</span>
+                        <span class="limit-stat-value" id="limitCurrentCount">0</span>
+                        <span class="limit-stat-separator">/</span>
+                        <span class="limit-stat-limit" id="limitMaxCount">20</span>
+                    </div>
+                </div>
+                <div class="limit-upgrade-info">
+                    <p class="upgrade-title">🚀 Passa al Piano PRO per prenotazioni illimitate!</p>
+                    <ul class="upgrade-features">
+                        <li>✓ Prenotazioni illimitate</li>
+                        <li>✓ Fino a 5 operatori</li>
+                        <li>✓ Fino a 3 sedi</li>
+                        <li>✓ Reportistica avanzata</li>
+                        <li>✓ SMS automatici</li>
+                    </ul>
+                    <div class="upgrade-pricing">
+                        <div class="pricing-option">
+                            <strong>€19/mese</strong> - PRO Mensile
+                        </div>
+                        <div class="pricing-option highlight">
+                            <strong>€119/anno</strong> - PRO Annuale <span class="savings">(Risparmia €109!)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="limit-modal-footer">
+                <button id="limitModalCloseBtn" class="btn btn-outline">Chiudi</button>
+                <button id="limitModalUpgradeBtn" class="btn btn-primary">Aggiorna Piano</button>
             </div>
         </div>
     </div>
