@@ -1959,3 +1959,30 @@ body {
     }
 }
 
+.info-icon {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #3b82f6;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.2s;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.info-icon:hover {
+    background: #2563eb;
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.info-icon:active {
+    transform: scale(0.95);
+}
+

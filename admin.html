@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PetCalendar - Dashboard Professionale</title>
+    <title>PetCalendar - Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -43,7 +43,7 @@
     <div class="container main-content">
         <!-- Dashboard Header -->
         <div class="admin-header">
-            <h2>Dashboard Professionale</h2>
+            <h2>Dashboard</h2>
             <div class="header-actions">
                 <div class="date-selector">
                     <input type="date" id="selectedDate" value="">
@@ -178,7 +178,10 @@
         <!-- Operators Tab -->
         <div id="operatorsTab" class="tab-content">
             <div class="operators-header">
-                <h3>Gestione Operatori</h3>
+                <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                    Gestione Operatori
+                    <span id="operatorsInfoIcon" class="info-icon" title="Clicca per maggiori informazioni">i</span>
+                </h3>
                 <button id="addOperatorBtn" class="btn btn-primary">+ Aggiungi Operatore</button>
             </div>
             <div id="operatorsList" class="operators-list"></div>
@@ -628,6 +631,45 @@
                     </div>
                     <button type="submit" class="btn btn-primary">Crea Prenotazione</button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Operators Info Modal -->
+    <div id="operatorsInfoModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close">&times;</span>
+            <h2>Cos'è un Operatore?</h2>
+            <div style="line-height: 1.8; color: var(--dark-color);">
+                <p style="margin-bottom: 1rem;">
+                    Gli <strong>operatori</strong> sono i membri del tuo team che forniscono i servizi agli animali. 
+                    Possono essere toelettatori, veterinari, assistenti o qualsiasi altra figura professionale 
+                    che lavora nella tua struttura.
+                </p>
+                <h4 style="color: var(--primary-color); margin-top: 1.5rem; margin-bottom: 0.75rem;">Funzionalità principali:</h4>
+                <ul style="margin-left: 1.5rem; margin-bottom: 1rem;">
+                    <li><strong>Assegnazione prenotazioni</strong> - Puoi assegnare ogni prenotazione a un operatore specifico</li>
+                    <li><strong>Gestione calendario</strong> - Visualizza le prenotazioni per ogni operatore nel calendario</li>
+                    <li><strong>Filtri avanzati</strong> - Filtra le prenotazioni per operatore per una migliore organizzazione</li>
+                    <li><strong>Ruoli</strong> - Assegna ruoli (Operatore o Manager) per gestire i permessi</li>
+                </ul>
+                <h4 style="color: var(--primary-color); margin-top: 1.5rem; margin-bottom: 0.75rem;">Come funziona:</h4>
+                <p style="margin-bottom: 1rem;">
+                    Quando crei una nuova prenotazione, puoi selezionare l'operatore che eseguirà il servizio. 
+                    Questo ti permette di:
+                </p>
+                <ul style="margin-left: 1.5rem; margin-bottom: 1rem;">
+                    <li>Organizzare meglio il lavoro del tuo team</li>
+                    <li>Evitare sovrapposizioni di prenotazioni per lo stesso operatore</li>
+                    <li>Tracciare le performance di ogni operatore</li>
+                    <li>Assegnare automaticamente le prenotazioni ai clienti preferiti</li>
+                </ul>
+                <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; border-left: 4px solid #2196F3; margin-top: 1.5rem;">
+                    <p style="margin: 0; color: #1565c0;">
+                        <strong>💡 Suggerimento:</strong> Aggiungi tutti i membri del tuo team come operatori per 
+                        una gestione ottimale delle prenotazioni!
+                    </p>
+                </div>
             </div>
         </div>
     </div>

@@ -329,6 +329,11 @@ function initEventListeners() {
         document.getElementById('operatorModal').classList.add('show');
     });
 
+    // Icona informativa operatori
+    document.getElementById('operatorsInfoIcon')?.addEventListener('click', () => {
+        document.getElementById('operatorsInfoModal').classList.add('show');
+    });
+
     document.getElementById('operatorForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         await saveOperator();
@@ -1482,10 +1487,7 @@ function loadOperators() {
             .onSnapshot((snapshot) => {
                 operatorsList.innerHTML = '';
                 
-                if (snapshot.empty) {
-                    operatorsList.innerHTML = '<p>Nessun operatore aggiunto. Clicca su "Aggiungi Operatore" per iniziare.</p>';
-                    return;
-                }
+              
                 
                 snapshot.forEach(doc => {
                     const operator = { id: doc.id, ...doc.data() };
