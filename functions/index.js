@@ -4,13 +4,13 @@ const admin = require("firebase-admin");
 
 // Definisci i parametri usando il nuovo sistema params
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
-// Price ID mensile: price_1SnaCWAf30HNX2wt9cFO7mdP
+// Price ID mensile: price_1SoAwIAu52HRDJcR69PmviBn
 const stripeMonthlyPriceId = defineString("STRIPE_PRICE_MONTHLY_ID", {
-  default: "price_1SnaCWAf30HNX2wt9cFO7mdP",
+  default: "price_1SoAwIAu52HRDJcR69PmviBn",
 });
-// Price ID annuale: da configurare
+// Price ID annuale: price_1SoAwfAu52HRDJcR1lZczrAX
 const stripeYearlyPriceId = defineString("STRIPE_PRICE_YEARLY_ID", {
-  default: "",
+  default: "price_1SoAwfAu52HRDJcR1lZczrAX",
 });
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
 const appUrl = defineString("APP_URL", {default: "https://petcalendar-67853.web.app"});
