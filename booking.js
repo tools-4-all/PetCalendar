@@ -2,7 +2,7 @@
 let companyId = null;
 let companyData = null;
 
-// Durata stimata dei servizi in minuti
+// Durata stimata dei servizi in minuti (fallback se non disponibile da Firestore)
 const SERVICE_DURATIONS = {
     'toelettatura-completa': 120, // 2 ore
     'bagno': 60, // 1 ora
@@ -10,6 +10,9 @@ const SERVICE_DURATIONS = {
     'pulizia-orecchie': 30, // 30 minuti
     'taglio-pelo': 90 // 1.5 ore
 };
+
+// Cache servizi caricati da Firestore
+let servicesCache = {};
 
 // Inizializzazione
 document.addEventListener('DOMContentLoaded', () => {
@@ -120,6 +123,9 @@ async function initBookingPage() {
         // Carica dati azienda
         await loadCompanyData();
         
+        // Carica servizi
+        await loadServices();
+        
         // Imposta data minima (domani)
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -216,6 +222,98 @@ async function loadCompanyData() {
     }
 }
 
+// Carica servizi da Firestore
+async function loadServices() {
+    if (!companyId) return;
+    
+    try {
+        const snapshot = await db.collection('services')
+            .where('companyId', '==', companyId)
+            .get();
+        
+        const serviceSelect = document.getElementById('service');
+        if (!serviceSelect) return;
+        
+        // Pulisci select mantenendo solo l'opzione "Seleziona"
+        const firstOption = serviceSelect.querySelector('option[value=""]');
+        serviceSelect.innerHTML = '';
+        if (firstOption) {
+            serviceSelect.appendChild(firstOption);
+        }
+        
+        // Svuota cache
+        servicesCache = {};
+        
+        // Ordina servizi per nome lato client
+        const servicesArray = [];
+        snapshot.forEach(doc => {
+            servicesArray.push({ id: doc.id, ...doc.data() });
+        });
+        
+        servicesArray.sort((a, b) => {
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+        
+        if (servicesArray.length === 0) {
+            // Se non ci sono servizi, usa quelli di default
+            const defaultServices = [
+                { id: 'toelettatura-completa', name: 'Toelettatura Completa', duration: 120 },
+                { id: 'bagno', name: 'Bagno', duration: 60 },
+                { id: 'taglio-unghie', name: 'Taglio Unghie', duration: 30 },
+                { id: 'pulizia-orecchie', name: 'Pulizia Orecchie', duration: 30 },
+                { id: 'taglio-pelo', name: 'Taglio Pelo', duration: 90 }
+            ];
+            
+            defaultServices.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id;
+                option.textContent = service.name;
+                serviceSelect.appendChild(option);
+                servicesCache[service.id] = service;
+            });
+        } else {
+            servicesArray.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id;
+                option.textContent = service.name;
+                serviceSelect.appendChild(option);
+                servicesCache[service.id] = service;
+            });
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento servizi:', error);
+        // Usa servizi di default in caso di errore
+        const serviceSelect = document.getElementById('service');
+        if (serviceSelect && serviceSelect.children.length <= 1) {
+            const defaultServices = [
+                { id: 'toelettatura-completa', name: 'Toelettatura Completa', duration: 120 },
+                { id: 'bagno', name: 'Bagno', duration: 60 },
+                { id: 'taglio-unghie', name: 'Taglio Unghie', duration: 30 },
+                { id: 'pulizia-orecchie', name: 'Pulizia Orecchie', duration: 30 },
+                { id: 'taglio-pelo', name: 'Taglio Pelo', duration: 90 }
+            ];
+            
+            defaultServices.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id;
+                option.textContent = service.name;
+                serviceSelect.appendChild(option);
+                servicesCache[service.id] = service;
+            });
+        }
+    }
+}
+
+// Ottieni durata servizio (da cache o fallback)
+function getServiceDuration(serviceId) {
+    if (servicesCache[serviceId]) {
+        return servicesCache[serviceId].duration || 60; // Default 60 minuti se non specificato
+    }
+    return SERVICE_DURATIONS[serviceId] || 60; // Default 60 minuti
+}
+
 // Setup event listeners
 function setupEventListeners() {
     const form = document.getElementById('bookingForm');
@@ -263,7 +361,7 @@ async function checkConflicts() {
         }
         
         // Durata del servizio
-        const duration = SERVICE_DURATIONS[service] || 60; // default 60 minuti
+        const duration = getServiceDuration(service); // default 60 minuti
         const endDateTime = new Date(bookingDateTime.getTime() + duration * 60 * 1000);
         
         // Cerca prenotazioni esistenti nello stesso slot temporale
@@ -303,7 +401,7 @@ async function checkConflicts() {
             conflictsBeforeQuery.forEach(doc => {
                 const booking = doc.data();
                 const bookingStart = booking.dateTime.toDate();
-                const serviceDuration = SERVICE_DURATIONS[booking.service] || 60;
+                const serviceDuration = getServiceDuration(booking.service);
                 const bookingEnd = new Date(bookingStart.getTime() + serviceDuration * 60 * 1000);
                 
                 // Se la prenotazione esistente finisce dopo l'inizio della nostra, c'è conflitto

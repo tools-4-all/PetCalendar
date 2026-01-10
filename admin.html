@@ -452,6 +452,18 @@
                     </div>
                 </div>
 
+                <!-- Services Management Section -->
+                <div class="settings-section">
+                    <h3>Gestione Servizi</h3>
+                    <p style="margin-bottom: 1rem; color: var(--dark-color);">
+                        Gestisci i servizi che i tuoi clienti possono prenotare. Puoi aggiungere, modificare o eliminare servizi.
+                    </p>
+                    <div style="margin-bottom: 1.5rem;">
+                        <button id="addServiceBtn" class="btn btn-primary">+ Aggiungi Servizio</button>
+                    </div>
+                    <div id="servicesList" class="services-list"></div>
+                </div>
+
                 <!-- Company Profile Section -->
                 <div class="settings-section">
                     <h3>Profilo Azienda</h3>
@@ -632,6 +644,32 @@
                     <button type="submit" class="btn btn-primary">Crea Prenotazione</button>
                 </form>
             </div>
+        </div>
+    </div>
+
+    <!-- Service Modal -->
+    <div id="serviceModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="serviceModalTitle">Aggiungi Servizio</h2>
+            <form id="serviceForm">
+                <div class="form-group">
+                    <label>Nome Servizio *</label>
+                    <input type="text" id="serviceName" placeholder="Es: Toelettatura Completa" required>
+                </div>
+                <div class="form-group">
+                    <label>Durata (minuti) (opzionale)</label>
+                    <input type="number" id="serviceDuration" placeholder="Es: 120" min="15" step="15">
+                    <small style="color: #666;">Durata stimata del servizio in minuti. Se non specificata, verrà usata una durata di default (60 minuti)</small>
+                </div>
+                <div class="form-group">
+                    <label>Prezzo di Default (€) (opzionale)</label>
+                    <input type="number" id="servicePrice" placeholder="0.00" step="0.01" min="0">
+                    <small style="color: #666;">Prezzo suggerito per questo servizio</small>
+                </div>
+                <input type="hidden" id="serviceId">
+                <button type="submit" class="btn btn-primary">Salva Servizio</button>
+            </form>
         </div>
     </div>
 

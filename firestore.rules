@@ -72,7 +72,22 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (isOwner(userId) || true);
     }
     
-    // Collection: operators
+    // Collection: services
+    // Gestione servizi - solo utenti autenticati
+    match /services/{serviceId} {
+        // Permetti lettura solo se l'utente è autenticato e il servizio appartiene all'utente
+        allow read: if isAuthenticated() && resource.data.companyId == request.auth.uid;
+        
+        // Permetti creazione solo se l'utente è autenticato e il companyId corrisponde
+        allow create: if isAuthenticated() && request.resource.data.companyId == request.auth.uid;
+        
+        // Permetti aggiornamento solo se l'utente è autenticato e il servizio appartiene all'utente
+        allow update: if isAuthenticated() && resource.data.companyId == request.auth.uid;
+        
+        // Permetti eliminazione solo se l'utente è autenticato e il servizio appartiene all'utente
+        allow delete: if isAuthenticated() && resource.data.companyId == request.auth.uid;
+    }
+
     // Gestione operatori - solo utenti autenticati
     match /operators/{operatorId} {
       allow read, write: if isAuthenticated();
