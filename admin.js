@@ -2596,16 +2596,32 @@ function shareViaWhatsApp() {
 
 // Genera QR Code
 function generateQRCode(link) {
-    if (!link || link.trim() === '') return;
-    
     const qrContainer = document.getElementById('qrCodeContainer');
     const qrSection = document.getElementById('qrCodeSection');
     const downloadBtn = document.getElementById('downloadQRBtn');
     
     if (!qrContainer || !qrSection) return;
     
-    // Verifica che QRCode sia disponibile
+    // Se il link non è disponibile, mostra messaggio di attesa
+    if (!link || link.trim() === '') {
+        qrContainer.innerHTML = '<p style="color: #666; font-style: italic;">Il QR code verrà generato quando il link sarà disponibile...</p>';
+        if (downloadBtn) {
+            downloadBtn.style.display = 'none';
+        }
+        return;
+    }
+    
+    // Verifica che QRCode sia disponibile (qrcodejs usa QRCode come costruttore)
     if (typeof QRCode === 'undefined') {
+        // Se non è disponibile, prova ad aspettare un po' e riprova (per caricamento asincrono)
+        qrContainer.innerHTML = '<p style="color: #666; font-style: italic;">Caricamento libreria QR Code...</p>';
+        setTimeout(() => {
+            if (typeof QRCode !== 'undefined') {
+                generateQRCode(link); // Riprova
+            } else {
+                qrContainer.innerHTML = '<p style="color: #dc2626;">Libreria QR Code non disponibile. Ricarica la pagina.</p>';
+            }
+        }, 1000);
         return;
     }
     
@@ -2613,34 +2629,34 @@ function generateQRCode(link) {
     qrContainer.innerHTML = '';
     
     try {
-        // Crea canvas per QR code
-        const canvas = document.createElement('canvas');
-        qrContainer.appendChild(canvas);
+        // Crea un div temporaneo per il QR code (qrcodejs lo crea automaticamente)
+        const qrDiv = document.createElement('div');
+        qrDiv.id = 'tempQRCode';
+        qrContainer.appendChild(qrDiv);
         
-        // Genera QR code usando la libreria qrcode
-        QRCode.toCanvas(canvas, link, {
+        // Genera QR code usando qrcodejs (API più semplice)
+        const qrcode = new QRCode(qrDiv, {
+            text: link,
             width: 256,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#ffffff'
-            }
-        }, (error) => {
-            if (error) {
-                qrContainer.innerHTML = '<p style="color: #dc2626;">Errore nella generazione QR code</p>';
-                return;
-            }
-            
-            // Mostra sezione QR code
-            qrSection.style.display = 'block';
-            
-            // Mostra pulsante download
-            if (downloadBtn) {
-                downloadBtn.style.display = 'inline-block';
-            }
+            height: 256,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
         });
+        
+        // Mostra sezione QR code
+        qrSection.style.display = 'block';
+        
+        // Mostra pulsante download quando il QR code è generato
+        if (downloadBtn) {
+            downloadBtn.style.display = 'inline-block';
+        }
     } catch (error) {
-        qrContainer.innerHTML = '<p style="color: #dc2626;">Errore nella generazione QR code</p>';
+        console.error('Errore generazione QR code:', error);
+        qrContainer.innerHTML = '<p style="color: #dc2626;">Errore nella generazione QR code: ' + error.message + '</p>';
+        if (downloadBtn) {
+            downloadBtn.style.display = 'none';
+        }
     }
 }
 
@@ -2649,16 +2665,48 @@ function downloadQRCode() {
     const qrContainer = document.getElementById('qrCodeContainer');
     if (!qrContainer) return;
     
+    // qrcodejs crea un canvas o un'immagine all'interno del div
     const canvas = qrContainer.querySelector('canvas');
-    if (!canvas) {
+    const img = qrContainer.querySelector('img');
+    
+    if (!canvas && !img) {
         alert('QR Code non ancora generato. Attendi qualche secondo.');
         return;
     }
     
     try {
-        // Converti canvas in blob (con fallback per browser vecchi)
-        if (canvas.toBlob) {
-            canvas.toBlob((blob) => {
+        if (canvas) {
+            // Se c'è un canvas, usalo direttamente
+            if (canvas.toBlob) {
+                canvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `qr-code-prenotazioni-${new Date().toISOString().split('T')[0]}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }, 'image/png');
+            } else {
+                // Fallback per browser vecchi
+                const dataUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `qr-code-prenotazioni-${new Date().toISOString().split('T')[0]}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        } else if (img) {
+            // Se c'è un'immagine, convertila in canvas e poi scarica
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = img.width;
+            tempCanvas.height = img.height;
+            const ctx = tempCanvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            tempCanvas.toBlob((blob) => {
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -2668,17 +2716,9 @@ function downloadQRCode() {
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
             }, 'image/png');
-        } else {
-            // Fallback per browser vecchi
-            const dataUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `qr-code-prenotazioni-${new Date().toISOString().split('T')[0]}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
         }
     } catch (error) {
+        console.error('Errore download QR code:', error);
         alert('Errore nel download del QR code. Prova a fare screenshot manualmente.');
     }
 }

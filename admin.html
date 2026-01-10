@@ -6,7 +6,7 @@
     <title>PetCalendar - Dashboard Professionale</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/main.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.5/locales/it.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -418,10 +418,10 @@
                             </div>
                             
                             <!-- QR Code Section -->
-                            <div id="qrCodeSection" style="margin-top: 2rem; padding: 1.5rem; background: #f9fafb; border-radius: 8px; text-align: center; display: none;">
+                            <div id="qrCodeSection" style="margin-top: 2rem; padding: 1.5rem; background: #f9fafb; border-radius: 8px; text-align: center;">
                                 <h4 style="margin-top: 0; margin-bottom: 1rem;">QR Code per Prenotazioni</h4>
-                                <div id="qrCodeContainer" style="margin: 1rem 0;">
-                                    <!-- QR Code verrà generato qui -->
+                                <div id="qrCodeContainer" style="margin: 1rem 0; min-height: 100px; display: flex; align-items: center; justify-content: center;">
+                                    <p style="color: #666; font-style: italic;">Il QR code verrà generato quando il link sarà disponibile...</p>
                                 </div>
                                 <p style="font-size: 0.9rem; color: #666; margin: 1rem 0;">
                                     Stampa questo QR code e mettilo in negozio, sui biglietti da visita o sui volantini.<br>
