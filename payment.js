@@ -16,9 +16,11 @@ function initStripe() {
 }
 
 // Prezzi abbonamenti (in centesimi - €)
+// NOTA: I prezzi effettivi sono quelli configurati su Stripe Dashboard
+// Questi valori sono solo per riferimento nel codice
 const SUBSCRIPTION_PRICES = {
-    'monthly': 1999, // €19.99
-    'yearly': 11999  // €119.99
+    'monthly': 1900, // €19.00
+    'yearly': 11900  // €119.00
 };
 
 // Nomi dei piani
@@ -72,10 +74,7 @@ async function createCheckoutSession(planType, price) {
             const createCheckoutSession = functions.httpsCallable('createSubscriptionCheckout');
             
             const result = await createCheckoutSession({
-                planType: planType,
-                price: price,
-                userId: currentUser.uid,
-                userEmail: currentUser.email
+                planType: planType
             });
             
             return result.data;
@@ -127,22 +126,51 @@ window.verifySubscriptionStatus = async function() {
         if (success === 'true' && sessionId) {
             // Verifica lo stato dell'abbonamento nel database
             if (typeof db !== 'undefined' && db && currentUser) {
-                const subscriptionDoc = await db.collection('subscriptions').doc(currentUser.uid).get();
+                // Aspetta un po' per permettere al webhook di processare il pagamento
+                // (il webhook potrebbe richiedere qualche secondo)
+                let attempts = 0;
+                const maxAttempts = 10; // 5 secondi totali
                 
-                if (subscriptionDoc.exists) {
-                    const subscription = subscriptionDoc.data();
-                    if (subscription.status === 'active') {
-                        alert('Abbonamento attivato con successo!');
-                        // Rimuovi i parametri dalla URL
+                const checkSubscription = async () => {
+                    const subscriptionDoc = await db.collection('subscriptions').doc(currentUser.uid).get();
+                    
+                    if (subscriptionDoc.exists) {
+                        const subscription = subscriptionDoc.data();
+                        if (subscription.status === 'active') {
+                            alert('Abbonamento attivato con successo!');
+                            // Rimuovi i parametri dalla URL
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                            // Se siamo in admin.html, ricarica le impostazioni
+                            if (window.location.pathname.includes('admin.html')) {
+                                if (typeof loadSettings === 'function') {
+                                    loadSettings();
+                                }
+                            }
+                            return true;
+                        }
+                    }
+                    
+                    // Se non ancora attivo, riprova dopo 500ms
+                    attempts++;
+                    if (attempts < maxAttempts) {
+                        setTimeout(checkSubscription, 500);
+                    } else {
+                        // Se dopo 5 secondi non è ancora attivo, mostra un messaggio
+                        alert('Il pagamento è stato ricevuto. L\'abbonamento sarà attivato a breve. Se non vedi l\'abbonamento attivo entro pochi minuti, contatta il supporto.');
                         window.history.replaceState({}, document.title, window.location.pathname);
-                        // Se siamo in admin.html, ricarica le impostazioni
                         if (window.location.pathname.includes('admin.html')) {
                             if (typeof loadSettings === 'function') {
                                 loadSettings();
                             }
                         }
                     }
-                }
+                    return false;
+                };
+                
+                await checkSubscription();
+            } else {
+                alert('Pagamento completato! Ricarica la pagina per vedere l\'abbonamento attivo.');
+                window.history.replaceState({}, document.title, window.location.pathname);
             }
         } else if (success === 'false') {
             alert('Il pagamento è stato annullato.');
@@ -150,6 +178,7 @@ window.verifySubscriptionStatus = async function() {
         }
     } catch (error) {
         console.error('Errore nella verifica abbonamento:', error);
+        alert('Errore nella verifica dell\'abbonamento. Controlla le impostazioni per vedere lo stato.');
     }
 };
 

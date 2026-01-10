@@ -2496,8 +2496,8 @@ async function loadSettings() {
             const planDetails = {
                 'free': 'Fino a 50 prenotazioni/mese - 2 operatori',
                 'pro': 'Prenotazioni illimitate - Fino a 5 operatori',
-                'monthly': 'Prenotazioni illimitate - Fino a 5 operatori - €19,99/mese',
-                'yearly': 'Prenotazioni illimitate - Fino a 5 operatori - €119,99/anno',
+                'monthly': 'Prenotazioni illimitate - Fino a 5 operatori - €19/mese',
+                'yearly': 'Prenotazioni illimitate - Fino a 5 operatori - €119/anno',
                 'enterprise': 'Operatori e sedi illimitati - Tutte le funzionalità'
             };
 
@@ -3141,8 +3141,8 @@ async function handlePlanChange(plan) {
 
     // Gestisci abbonamenti mensili e annuali con Stripe
     if (plan === 'monthly' || plan === 'yearly') {
-        const planName = plan === 'monthly' ? 'PRO Mensile (€19,99/mese)' : 'PRO Annuale (€119,99/anno)';
-        const price = plan === 'monthly' ? '19.99' : '119.99';
+        const planName = plan === 'monthly' ? 'PRO Mensile (€19/mese)' : 'PRO Annuale (€119/anno)';
+        const price = plan === 'monthly' ? '19' : '119';
         
         const confirmUpgrade = confirm(`Vuoi sottoscrivere l'abbonamento ${planName}?`);
         if (!confirmUpgrade) return;
