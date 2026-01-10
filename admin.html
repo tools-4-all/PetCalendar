@@ -365,11 +365,9 @@
                             <div class="plan-price">€19,99<span>/mese</span></div>
                             <ul class="plan-features">
                                 <li>Prenotazioni illimitate</li>
-                                <li>Fino a 5 operatori</li>
-                                <li>Fino a 3 sedi</li>
+                                <li>Fino a 3 operatori</li>
                                 <li>Reportistica avanzata</li>
                                 <li>Integrazione pagamenti</li>
-                                <li>SMS automatici</li>
                                 <li>Export dati</li>
                             </ul>
                             <button class="btn btn-primary plan-btn" data-plan="monthly" data-price="19.99">Abbonati Mensile</button>
@@ -380,11 +378,9 @@
                             <div class="plan-price">€119,99<span>/anno</span></div>
                             <ul class="plan-features">
                                 <li>Prenotazioni illimitate</li>
-                                <li>Fino a 5 operatori</li>
-                                <li>Fino a 3 sedi</li>
+                                <li>Fino a 3 operatori</li>
                                 <li>Reportistica avanzata</li>
                                 <li>Integrazione pagamenti</li>
-                                <li>SMS automatici</li>
                                 <li>Export dati</li>
                                 <li><strong>Risparmio di €120 all'anno</strong></li>
                             </ul>
@@ -738,10 +734,9 @@
                     <p class="upgrade-title">🚀 Passa al Piano PRO per prenotazioni illimitate!</p>
                     <ul class="upgrade-features">
                         <li>✓ Prenotazioni illimitate</li>
-                        <li>✓ Fino a 5 operatori</li>
-                        <li>✓ Fino a 3 sedi</li>
+                        <li>✓ Fino a 3 operatori</li>
                         <li>✓ Reportistica avanzata</li>
-                        <li>✓ SMS automatici</li>
+                        <li>✓ Export dati</li>
                     </ul>
                     <div class="upgrade-pricing">
                         <div class="pricing-option">
@@ -756,6 +751,52 @@
             <div class="limit-modal-footer">
                 <button id="limitModalCloseBtn" class="btn btn-outline">Chiudi</button>
                 <button id="limitModalUpgradeBtn" class="btn btn-primary">Aggiorna Piano</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Operators Limit Exceeded Modal -->
+    <div id="operatorsLimitExceededModal" class="modal">
+        <div class="modal-content limit-modal-content">
+            <div class="limit-modal-header">
+                <div class="limit-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <h2>Limite Operatori Raggiunto</h2>
+            </div>
+            <div class="limit-modal-body">
+                <p class="limit-message" id="operatorsLimitMessage">Hai raggiunto il limite di operatori per il tuo piano.</p>
+                <div class="limit-stats">
+                    <div class="limit-stat-item">
+                        <span class="limit-stat-label">Operatori attuali:</span>
+                        <span class="limit-stat-value" id="operatorsCurrentCount">0</span>
+                        <span class="limit-stat-separator">/</span>
+                        <span class="limit-stat-limit" id="operatorsMaxCount">2</span>
+                    </div>
+                </div>
+                <div class="limit-upgrade-info">
+                    <p class="upgrade-title">🚀 Passa al Piano PRO per più operatori!</p>
+                    <ul class="upgrade-features">
+                        <li>✓ Prenotazioni illimitate</li>
+                        <li>✓ Fino a 3 operatori</li>
+                        <li>✓ Reportistica avanzata</li>
+                        <li>✓ Export dati</li>
+                    </ul>
+                    <div class="upgrade-pricing">
+                        <div class="pricing-option">
+                            <strong>€19/mese</strong> - PRO Mensile
+                        </div>
+                        <div class="pricing-option highlight">
+                            <strong>€119/anno</strong> - PRO Annuale <span class="savings">(Risparmia €109!)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="limit-modal-footer">
+                <button id="operatorsLimitModalCloseBtn" class="btn btn-outline">Chiudi</button>
+                <button id="operatorsLimitModalUpgradeBtn" class="btn btn-primary">Aggiorna Piano</button>
             </div>
         </div>
     </div>

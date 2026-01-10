@@ -1494,6 +1494,40 @@ function createOperatorCard(operator) {
 async function saveOperator() {
     if (!currentUser) return;
 
+    // Controlla il limite di operatori in base all'abbonamento
+    const subscriptionDoc = await db.collection('subscriptions').doc(currentUser.uid).get();
+    const subscription = subscriptionDoc.exists ? subscriptionDoc.data() : null;
+    
+    // Verifica se l'utente ha un abbonamento FREE o nessun abbonamento
+    const isFreePlan = !subscription || 
+                      !subscription.plan || 
+                      subscription.plan === 'free' ||
+                      (subscription.status !== 'active');
+    
+    const FREE_PLAN_OPERATORS_LIMIT = 2;
+    const PRO_PLAN_OPERATORS_LIMIT = 3;
+    
+    // Conta gli operatori esistenti
+    const operatorsSnapshot = await db.collection('operators').get();
+    const currentOperatorsCount = operatorsSnapshot.size;
+    
+    // Determina il limite in base al piano
+    let maxOperators;
+    if (isFreePlan) {
+        maxOperators = FREE_PLAN_OPERATORS_LIMIT;
+    } else {
+        maxOperators = PRO_PLAN_OPERATORS_LIMIT;
+    }
+    
+    // Verifica se si sta aggiungendo un nuovo operatore o modificando uno esistente
+    const operatorForm = document.getElementById('operatorForm');
+    const editingOperatorId = operatorForm.dataset.editingOperatorId;
+    
+    if (!editingOperatorId && currentOperatorsCount >= maxOperators) {
+        showOperatorsLimitExceededModal(currentOperatorsCount, maxOperators);
+        return;
+    }
+
     const operatorData = {
         name: document.getElementById('operatorName').value,
         email: document.getElementById('operatorEmail').value,
@@ -1503,7 +1537,15 @@ async function saveOperator() {
     };
 
     try {
-        await db.collection('operators').add(operatorData);
+        if (editingOperatorId) {
+            // Modifica operatore esistente
+            await db.collection('operators').doc(editingOperatorId).update(operatorData);
+            delete operatorForm.dataset.editingOperatorId;
+        } else {
+            // Crea nuovo operatore
+            await db.collection('operators').add(operatorData);
+        }
+        
         document.getElementById('operatorForm').reset();
         document.getElementById('operatorModal').classList.remove('show');
         loadOperators();
@@ -2495,10 +2537,10 @@ async function loadSettings() {
             };
             const planDetails = {
                 'free': 'Fino a 20 prenotazioni/mese - 2 operatori',
-                'pro': 'Prenotazioni illimitate - Fino a 5 operatori',
-                'monthly': 'Prenotazioni illimitate - Fino a 5 operatori - €19/mese',
-                'yearly': 'Prenotazioni illimitate - Fino a 5 operatori - €119/anno',
-                'enterprise': 'Operatori e sedi illimitati - Tutte le funzionalità'
+                'pro': 'Prenotazioni illimitate - Fino a 3 operatori',
+                'monthly': 'Prenotazioni illimitate - Fino a 3 operatori - €19/mese',
+                'yearly': 'Prenotazioni illimitate - Fino a 3 operatori - €119/anno',
+                'enterprise': 'Operatori illimitati - Tutte le funzionalità'
             };
 
             // Mostra il tipo di abbonamento con più dettagli
@@ -3324,6 +3366,56 @@ function showLimitExceededModal(currentCount, maxCount) {
     // Gestisci chiusura modal
     const closeBtn = document.getElementById('limitModalCloseBtn');
     const upgradeBtn = document.getElementById('limitModalUpgradeBtn');
+    
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            modal.classList.remove('show');
+        };
+    }
+    
+    if (upgradeBtn) {
+        upgradeBtn.onclick = () => {
+            modal.classList.remove('show');
+            // Vai alla sezione impostazioni
+            const settingsTab = document.querySelector('[data-tab="settings"]');
+            if (settingsTab) {
+                settingsTab.click();
+            }
+        };
+    }
+    
+    // Chiudi cliccando fuori dal modal
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('show');
+        }
+    };
+}
+
+// Mostra modal limite operatori superato
+function showOperatorsLimitExceededModal(currentCount, maxCount) {
+    const modal = document.getElementById('operatorsLimitExceededModal');
+    const currentCountEl = document.getElementById('operatorsCurrentCount');
+    const maxCountEl = document.getElementById('operatorsMaxCount');
+    const messageEl = document.getElementById('operatorsLimitMessage');
+    
+    if (!modal || !currentCountEl || !maxCountEl || !messageEl) {
+        // Fallback a alert se il modal non esiste
+        alert(`Hai raggiunto il limite di ${maxCount} operatori per il tuo piano.\n\n` +
+              `Operatori attuali: ${currentCount}/${maxCount}\n\n` +
+              `Per aggiungere più operatori, passa al piano PRO (€19/mese o €119/anno).`);
+        return;
+    }
+    
+    currentCountEl.textContent = currentCount;
+    maxCountEl.textContent = maxCount;
+    messageEl.textContent = `Hai raggiunto il limite di ${maxCount} operatori per il tuo piano.`;
+    
+    modal.classList.add('show');
+    
+    // Gestisci chiusura modal
+    const closeBtn = document.getElementById('operatorsLimitModalCloseBtn');
+    const upgradeBtn = document.getElementById('operatorsLimitModalUpgradeBtn');
     
     if (closeBtn) {
         closeBtn.onclick = () => {
